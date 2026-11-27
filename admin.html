@@ -1,0 +1,3203 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin mặt bằng 3D</title>
+  <style>
+    :root { --bg: #f1f5f9; --panel: #ffffff; --line: #e2e8f0; --text: #1e293b; --muted: #64748b; --accent: #2563eb; --danger: #dc2626; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, "Segoe UI", sans-serif; overflow: hidden; }
+    button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--text); border-radius: 7px; padding: 5px 10px; }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.primary:hover { filter: brightness(1.1); color: #fff; }
+    button.danger:hover { border-color: var(--danger); color: var(--danger); }
+    button.on { background: #dbeafe; border-color: var(--accent); color: var(--accent); }
+    input, select { font: inherit; border: 1px solid var(--line); border-radius: 6px; padding: 4px 7px; width: 100%; color: var(--text); background: #fff; }
+    input[type=color] { padding: 1px 2px; height: 28px; }
+    input:focus { outline: 2px solid #bfdbfe; border-color: var(--accent); }
+
+    header { height: 48px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
+    header h1 { font-size: 15px; margin: 0 12px 0 0; white-space: nowrap; }
+    header .sp { flex: 1; }
+    #saveState { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    #saveState.err { color: var(--danger); }
+
+    main { position: absolute; top: 48px; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1fr 390px; }
+    #editor { position: relative; overflow: hidden; background: #e7ecf1; }
+    #plan { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    #toolbar { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+    #toolbar button { box-shadow: 0 1px 4px rgba(15,23,42,.1); }
+    #hintBar { position: absolute; left: 10px; bottom: 10px; right: 10px; background: rgba(15,23,42,.85); color: #fff; padding: 7px 11px; border-radius: 8px; font-size: 12px; pointer-events: none; }
+    #coord:empty { display: none; }
+    #coord { position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,.9); padding: 3px 8px; border-radius: 6px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    aside { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; }
+    #previewWrap { position: sticky; top: 0; z-index: 3; background: var(--panel); border-bottom: 1px solid var(--line); padding: 8px; }
+    #preview { height: 250px; border-radius: 8px; }
+    #previewWrap.big { position: fixed; inset: 60px 24px 24px 24px; z-index: 50; box-shadow: 0 10px 40px rgba(0,0,0,.35); border-radius: 12px; display: flex; flex-direction: column; }
+    #previewWrap.big #preview { flex: 1; height: auto; }
+    .pv-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .pv-bar b { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    section { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+    section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px 10px; }
+    label { display: block; font-size: 12px; color: var(--muted); }
+    label > input, label > select { margin-top: 3px; }
+    .full { grid-column: 1 / -1; }
+    .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .towerItem { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px; cursor: pointer; border: 1px solid transparent; }
+    .towerItem:hover { background: #f8fafc; }
+    .towerItem.sel { background: #eff6ff; border-color: #bfdbfe; }
+    .towerItem i { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+    .towerItem span { flex: 1; }
+    .plan { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-bottom: 8px; cursor: pointer; }
+    .plan.sel { border-color: var(--accent); background: #f8fbff; }
+    .plan .head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; font-weight: 600; }
+    .plan .head .sp { flex: 1; }
+    .plan input { width: 64px; }
+    .plan button { padding: 3px 8px; font-size: 12px; }
+    .warn { background: #fef3c7; color: #92400e; border-radius: 7px; padding: 7px 9px; font-size: 12px; margin-top: 8px; }
+    .warn div + div { margin-top: 3px; }
+    .empty { color: var(--muted); font-style: italic; }
+    .stackWrap { display: grid; grid-template-columns: 1fr 120px; gap: 10px; align-items: start; }
+    .tplChip { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; margin-bottom: 5px; padding: 5px 8px; }
+    .tplChip i { width: 14px; height: 14px; border-radius: 4px; flex: none; border: 1px solid rgba(15,23,42,.15); }
+    .tplChip span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tplChip em { font-style: normal; color: var(--muted); font-size: 11px; }
+    .tplChip.on { border-color: var(--accent); background: #eff6ff; box-shadow: 0 0 0 2px #bfdbfe; }
+    .stackCol { max-height: 380px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; padding: 3px; background: #f8fafc; user-select: none; touch-action: none; }
+    .stackCol .fl { display: flex; align-items: center; gap: 6px; height: 19px; margin: 1px 0; padding: 0 6px; border-radius: 3px; font-size: 11px; cursor: crosshair; color: #0f172a; }
+    .stackCol .fl b { width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
+    .stackCol .fl span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; opacity: .8; }
+    .stackCol .fl.empty { background: repeating-linear-gradient(45deg, #fff, #fff 4px, #fee2e2 4px, #fee2e2 8px); color: #b91c1c; }
+    .plan .head input[data-pname] { width: 110px; font-weight: 600; padding: 2px 6px; }
+    .plan .tplDot { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+    button.on.align { background: #fef3c7; border-color: #d97706; color: #92400e; }
+    .layoutRow { margin-top: 6px; padding: 5px 7px; background: #eef2ff; border-radius: 6px; }
+
+    /* hộp thoại dựng tòa từ layout */
+    #lzModal { position: fixed; inset: 0; z-index: 100; background: rgba(15,23,42,.55); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    #lzModal[hidden] { display: none; }
+    .lz-box { background: #fff; border-radius: 12px; width: min(1280px, 100%); height: min(820px, 100%); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+    .lz-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+    .lz-head .sp { flex: 1; }
+    .lz-body { flex: 1; display: grid; grid-template-columns: 1fr 330px; min-height: 0; }
+    .lz-stage { position: relative; background: #e7ecf1; min-height: 0; }
+    #lzCanvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+    .lz-stage, .lz-stage * { -webkit-user-select: none; user-select: none; }
+    #lzUnitList { max-height: 260px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+    #lzUnitList:empty { display: none; }
+    .lz-urow { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 12px; }
+    .lz-urow:last-child { border-bottom: 0; }
+    .lz-urow:hover { background: #f8fafc; }
+    .lz-urow.sel { background: #fffbeb; box-shadow: inset 3px 0 0 #d97706; }
+    .lz-urow i { width: 10px; height: 10px; border-radius: 3px; background: #10b981; flex: none; }
+    .lz-urow input { width: 64px; padding: 2px 6px; }
+    .lz-urow span { flex: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .lz-urow button { padding: 2px 7px; font-size: 12px; }
+    #lzCmpBox { position: absolute; top: 56px; right: 10px; z-index: 5; width: 230px; background: #fff; border: 1px solid #f59e0b; border-radius: 10px; box-shadow: 0 10px 28px rgba(15,23,42,.2); padding: 10px; font-size: 12px; }
+    #lzCmpBox[hidden] { display: none; }
+    #lzCmpBox b { display: block; font-size: 13px; margin-bottom: 6px; color: #92400e; }
+    #lzCmpHead { display: flex; align-items: center; gap: 6px; margin: -10px -10px 8px; padding: 8px 10px; background: #fffbeb; border-radius: 10px 10px 0 0; cursor: grab; user-select: none; touch-action: none; }
+    #lzCmpHead b { margin: 0; flex: 1; }
+    #lzCmpHead span { color: #b45309; font-size: 13px; letter-spacing: 1px; }
+    #lzCmpHead button { padding: 1px 7px; font-size: 12px; }
+    #lzCmpBox.min { padding-bottom: 0; }
+    #lzCmpBox.min #lzCmpHead { margin-bottom: 0; border-radius: 10px; }
+    #lzCmpBox.min #lzCmpBody { display: none; }
+    #lzCmpBox label { margin: 6px 0; }
+    #lzCmpBox input[type=range] { padding: 0; }
+    #lzCmpBox .row button { flex: 1; padding: 4px 6px; }
+    #lzCmpInfo { margin: 6px 0; padding: 6px 8px; background: #fffbeb; border-radius: 6px; color: #78350f; }
+    #lzMenu { position: absolute; z-index: 6; background: #fff; border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 10px 28px rgba(15,23,42,.2); padding: 4px; min-width: 200px; }
+    #lzMenu[hidden] { display: none; }
+    #lzMenu b { display: block; font-size: 11px; color: var(--muted); padding: 4px 10px 2px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+    #lzMenu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 6px 10px; border-radius: 6px; font-size: 13px; box-shadow: none; }
+    #lzMenu button:hover { background: #eff6ff; color: var(--accent); }
+    #lzMenu button.danger:hover { background: #fef2f2; color: var(--danger); }
+    .lz-seg { display: inline-flex; box-shadow: 0 1px 4px rgba(15,23,42,.1); border-radius: 7px; }
+    #lzTools .lz-seg button { box-shadow: none; border-radius: 0; margin-left: -1px; }
+    #lzTools .lz-seg button:first-child { border-radius: 7px 0 0 7px; margin-left: 0; }
+    #lzTools .lz-seg button:last-child { border-radius: 0 7px 7px 0; }
+    #lzCanvas::selection { background: transparent; }
+    #lzMsg { position: absolute; left: 10px; right: 10px; bottom: 10px; background: rgba(15,23,42,.85); color: #fff; padding: 7px 11px; border-radius: 8px; font-size: 12px; pointer-events: none; }
+    #lzTools { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+    #lzTools button { box-shadow: 0 1px 4px rgba(15,23,42,.1); }
+    .lz-side { overflow-y: auto; border-left: 1px solid var(--line); padding: 4px 14px 14px; }
+    .lz-side h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 8px; }
+    .lz-rng { margin-bottom: 8px; }
+    .lz-rng b { float: right; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+    .lz-rng input { padding: 0; }
+    .lz-chk { display: flex; gap: 6px; align-items: center; font-size: 12px; margin: 5px 0; color: var(--text); }
+    .lz-chk input { width: auto; margin: 0; }
+    #lzInfo { background: #f8fafc; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; font-size: 12px; margin-top: 10px; }
+    @media (max-width: 900px) {
+      #lzModal { padding: 0; } .lz-box { height: 100%; border-radius: 0; }
+      .lz-body { grid-template-columns: 1fr; grid-template-rows: 55% 45%; }
+      .lz-side { border-left: 0; border-top: 1px solid var(--line); }
+    }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; grid-template-rows: 55% 45%; }
+      aside { border-left: 0; border-top: 1px solid var(--line); }
+      #preview { height: 180px; }
+      header h1 { display: none; }
+    }
+  </style>
+  <script type="importmap">
+    { "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+  </script>
+  <script src="sample-data.js"></script>
+  <script src="building3d.js"></script>
+</head>
+<body>
+<header>
+  <h1>Admin mặt bằng 3D</h1>
+  <button id="btnNew">Dự án mới</button>
+  <button id="btnSample">Nạp dữ liệu mẫu</button>
+  <button id="btnImport">Nhập JSON</button>
+  <button id="btnExport" class="primary">Xuất JSON</button>
+  <a href="viewer.html" target="_blank"><button>Mở trang xem 3D ↗</button></a>
+  <span class="sp"></span>
+  <span id="saveState"></span>
+  <input id="fileJson" type="file" accept=".json,application/json" hidden>
+  <input id="fileImg" type="file" accept="image/*" hidden>
+  <input id="fileLayout" type="file" accept="image/*,.pdf,application/pdf" hidden>
+</header>
+
+<main>
+  <div id="editor">
+    <canvas id="plan"></canvas>
+    <div id="toolbar">
+      <button data-mode="select" class="on" title="Chọn, kéo để di chuyển tòa (V)">✋ Chọn / kéo</button>
+      <button id="btnDrawTower" title="Vẽ tòa mới (N)">＋ Vẽ tòa mới</button>
+      <button id="btnLayoutTower" title="Tải ảnh / PDF mặt bằng tầng → tự dựng viền tòa và căn hộ">📐 Tòa từ layout</button>
+      <button data-mode="measure" title="Đo 2 điểm đã biết khoảng cách để chỉnh tỉ lệ">📏 Đo tỉ lệ</button>
+      <button id="btnDims" class="on" title="Ẩn / hiện thước kích thước của mẫu đang chọn">📏 Thước</button>
+      <button id="btnFit" title="Vừa màn hình (F)">⤢ Vừa màn hình</button>
+      <button id="btnUndo" title="Hoàn tác (Ctrl+Z)">↶</button>
+      <button id="btnRedo" title="Làm lại (Ctrl+Y / Ctrl+Shift+Z)">↷</button>
+    </div>
+    <div id="coord"></div>
+    <div id="hintBar"></div>
+  </div>
+
+  <aside>
+    <div id="previewWrap">
+      <div class="pv-bar"><b>Xem trước 3D</b><span class="row"><button id="btnPvTower">Xem tòa đang chọn</button><button id="btnPvBig">Phóng to</button></span></div>
+      <div id="preview"></div>
+    </div>
+
+    <section>
+      <h2>Dự án</h2>
+      <div class="grid2">
+        <label class="full">Tên dự án<input id="pName"></label>
+        <label>Chiều rộng mặt bằng (m)<input id="pW" type="number" min="10" step="1"></label>
+        <label>Chiều cao mặt bằng (m)<input id="pH" type="number" min="10" step="1"></label>
+        <label>Hướng Bắc lệch (độ)<input id="pNorth" type="number" step="1" title="0 = phía trên ảnh là hướng Bắc. Nếu Bắc lệch sang phải 30° thì nhập 30."></label>
+        <div class="muted" style="align-self:end">0 = phía trên ảnh là Bắc. Dùng để tự tính hướng căn.</div>
+        <div class="full row">
+          <button id="btnImg">🖼 Tải ảnh mặt bằng tổng thể</button>
+          <button id="btnImgClear" class="danger">Bỏ ảnh</button>
+        </div>
+        <div class="full muted" id="imgInfo"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Danh sách tòa <button id="btnAddTower" class="primary">＋ Vẽ tòa mới</button></h2>
+      <div id="towerList"></div>
+    </section>
+
+    <section id="towerSec"></section>
+  </aside>
+</main>
+
+<div id="lzModal" hidden>
+  <div class="lz-box">
+    <div class="lz-head"><b id="lzTitle">Dựng tòa từ layout</b><span class="muted" id="lzFile"></span><span class="sp"></span>
+      <button id="lzPick">Chọn file khác</button><button id="lzClose">✕ Đóng</button></div>
+    <div class="lz-body">
+      <div class="lz-stage">
+        <canvas id="lzCanvas"></canvas>
+        <div id="lzTools">
+          <button id="lzMeasure" title="Bấm 2 điểm trên layout đã biết khoảng cách (ví dụ đường kích thước) để tính tỉ lệ">📏 Đo tỉ lệ trên layout</button>
+          <button id="lzDims" class="on" title="Ẩn / hiện thước kích thước của viền đang vẽ">📏 Thước</button>
+          <button id="lzCompare" title="Đè ảnh mẫu cũ lên ảnh này để chỉnh tỉ lệ & vị trí cho khớp" hidden>⧉ So với mẫu cũ</button>
+          <button id="lzCrop" title="Bật rồi kéo chuột khoanh vùng tòa để phóng to cho nét (Ctrl+Z để quay lại)">⬚ Khoanh vùng</button>
+          <button id="lzRoiClear" title="Quay lại xem cả trang">↺ Cả trang</button>
+          <span class="lz-seg" id="lzEdgeSeg" title="Kiểu chỉnh cạnh (viền tòa và căn)">
+            <button data-edge="ortho" title="Kéo nút giữa cạnh = đẩy / kéo cả cạnh, giữ góc vuông · vẽ từng góc tự thẳng ngang / dọc">⟂ Vuông góc</button>
+            <button data-edge="free" class="on" title="Kéo nút giữa cạnh = thêm góc">／ Tự do</button>
+            <button data-edge="curve" title="Kéo nút giữa cạnh = uốn cạnh thành đường cong">◠ Cong</button>
+          </span>
+          <button id="lzEditOutline" title="Bật để kéo / thêm / xóa góc viền tòa; tắt để vẽ căn không bị vướng">✏ Sửa viền</button>
+          <button id="lzDrawOutline" title="Bấm từng góc quanh vùng muốn lấy làm viền tòa">Vẽ lại viền</button>
+          <button id="lzDrawUnit" title="Tự vẽ căn: kéo chuột quây hình chữ nhật, hoặc bấm từng góc">▭ Vẽ căn</button>
+          <button id="lzAllOff" title="Tắt hết các vùng máy tự nhận diện (chỉ giữ căn bạn vẽ)">Tắt vùng tự động</button>
+          <button id="lzEditUnits" title="Biến các vùng đang bật thành căn chỉnh được: kéo góc, thêm / xóa góc, dời căn">✎ Chỉnh căn</button>
+          <button id="lzHideOff" title="Ẩn / hiện các vùng đang tắt">Ẩn vùng tắt</button>
+          <button id="lzHideUnits" title="Ẩn / hiện lớp căn để nhìn rõ bản vẽ">Ẩn lớp căn</button>
+          <button id="lzAutoOutline" title="Bỏ các chỉnh tay, dùng lại viền máy nhận diện" hidden>↺ Viền tự động</button>
+        </div>
+        <div id="lzMsg"></div>
+        <div id="lzMenu" hidden></div>
+        <div id="lzCmpBox" hidden>
+          <div id="lzCmpHead" title="Kéo để dời bảng"><span>⠿</span><b>⧉ So với mẫu cũ</b><button id="lzCmpMin" title="Thu gọn / mở rộng">▾</button></div><div id="lzCmpBody">
+          <label>Mẫu để so<select id="lzCmpPlan"></select></label>
+          <label>Độ đậm ảnh mẫu cũ<input id="lzCmpAlpha" type="range" min="10" max="95" value="55"></label>
+          <div class="row"><button id="lzCmpMinus" title="Thu nhỏ ảnh mẫu cũ (giữ Shift: chỉnh nhỏ hơn)">− Nhỏ lại</button><button id="lzCmpPlus" title="Phóng to ảnh mẫu cũ (giữ Shift: chỉnh nhỏ hơn)">＋ To ra</button></div>
+          <div id="lzCmpInfo"></div>
+          <div class="muted" style="margin-bottom:8px"><b style="display:inline;color:inherit;font-size:12px">Kéo chuột</b>: dời ảnh mẫu cũ · <b style="display:inline;color:inherit;font-size:12px">Lăn chuột</b>: to / nhỏ quanh con trỏ · phím mũi tên: nhích. Chỉnh cho các căn giống nhau trùng khít.</div>
+          <div class="row" style="margin:6px 0"><button data-take="outline" title="Chép viền mẫu cũ (đặt đúng chỗ) để sửa tiếp">⧉ Lấy viền mẫu cũ</button><button data-take="all" title="Chép viền + toàn bộ căn của mẫu cũ để sửa tiếp">⧉ Lấy viền + căn</button></div>
+          <div class="row"><button id="lzCmpDone" class="primary">✓ Xong, đã khớp</button><button id="lzCmpOff" title="Bỏ so sánh, quay về nhập chiều ngang">Bỏ</button></div></div>
+        </div>
+      </div>
+      <div class="lz-side">
+        <h3>Viền tòa</h3>
+        <label class="lz-rng">Độ đậm nét tường <b id="lzThrV"></b><input id="lzThr" type="range" min="30" max="240" step="1"></label>
+        <label class="lz-rng">Bỏ nét mảnh (nội thất, chữ, kích thước) <b id="lzThinV"></b><input id="lzThin" type="range" min="0" max="6" step="1"></label>
+        <label class="lz-rng">Bịt khe cửa / cửa sổ <b id="lzGapV"></b><input id="lzGap" type="range" min="0" max="120" step="1"></label>
+        <label class="lz-rng">Làm gọn góc <b id="lzSimpV"></b><input id="lzSimp" type="range" min="1" max="20" step="1"></label>
+        <label class="lz-chk"><input id="lzOrtho" type="checkbox" checked> Nắn cạnh về góc vuông</label>
+
+        <h3>Tách căn hộ</h3>
+        <label class="lz-rng">Bỏ tường mỏng hơn (vách trong căn) <b id="lzUThinV"></b><input id="lzUThin" type="range" min="0" max="8" step="1"></label>
+        <label class="lz-rng">Bịt cửa đi trong căn <b id="lzUGapV"></b><input id="lzUGap" type="range" min="0" max="45" step="1"></label>
+        <label>Bỏ vùng nhỏ hơn (m²) — gộp vào vùng bên cạnh<input id="lzMinA" type="number" min="0" step="1" value="18"></label>
+        <div class="muted" style="margin-top:6px">Trên hình: <b>bấm</b> vào vùng để bật/tắt (hành lang, thang máy…) · <b>Shift + bấm</b> để gộp vùng vào vùng vừa bấm trước đó.</div>
+
+        <h3>Danh sách căn <span class="muted" id="lzListCount" style="text-transform:none;letter-spacing:0"></span></h3>
+        <div id="lzUnitList"></div>
+        <div class="muted" id="lzListHint" style="margin-top:6px"></div>
+
+        <h3>Kích thước & vị trí</h3>
+        <div class="grid2">
+          <label>Chiều ngang tòa (m)<input id="lzRealW" type="number" min="1" step="0.1"></label>
+          <label>Xoay khi đặt (độ)<input id="lzRot" type="number" step="1" value="0"></label>
+        </div>
+        <div class="muted" style="margin-top:4px">Chiều ngang = bề rộng viền tòa theo chiều ngang của ảnh. Không biết thì dùng "📏 Đo tỉ lệ trên layout".</div>
+        <label class="lz-chk" id="lzRefRow" style="margin-top:8px"><input id="lzUseRef" type="checkbox" checked> <span><b>Khớp vị trí & tỉ lệ với layout đã bỏ trước</b> (ảnh cùng khổ) — phần không chọn sẽ không có, tầng chồng đúng lên tầng dưới</span></label>
+        <div class="row" id="lzRefView" style="margin:4px 0 0 22px"><button id="lzRefCmp" title="Đè ảnh mẫu cũ lên để kiểm tra / chỉnh lại">⧉ Xem / chỉnh so sánh</button><span class="muted">viền cam đứt = mẫu cũ</span></div>
+        <div id="lzRefTake" style="margin-left:22px"><div class="row" style="margin:6px 0"><button data-take="outline" title="Chép viền mẫu cũ (đặt đúng chỗ) để sửa tiếp">⧉ Lấy viền mẫu cũ</button><button data-take="all" title="Chép viền + toàn bộ căn của mẫu cũ để sửa tiếp">⧉ Lấy viền + căn</button></div></div>
+        <div class="warn" id="lzRefNote" style="display:none"></div>
+        <div id="lzInfo"></div>
+
+        <h3>Áp dụng</h3>
+        <div id="lzRangeBox">
+          <div class="grid2" id="lzNewRow" style="margin-bottom:8px">
+            <label>Mã tòa<input id="lzCode" placeholder="P6"></label>
+            <label>Tổng số tầng<input id="lzFloors" type="number" min="1" max="120" value="20"></label>
+          </div>
+          <div class="row" style="margin-bottom:4px">Áp cho tầng <input id="lzFrom" type="number" min="1" style="width:64px"> đến <input id="lzTo" type="number" min="1" style="width:64px"></div>
+          <div class="row" style="margin-bottom:4px">Chỉ các tầng <input id="lzList" placeholder="vd 28, 30, 32-34 (trống = cả khoảng)" style="flex:1;min-width:140px">
+            <button type="button" id="lzEven" title="Các tầng chẵn trong khoảng từ…đến">Chẵn</button><button type="button" id="lzOdd" title="Các tầng lẻ trong khoảng từ…đến">Lẻ</button></div>
+          <div class="muted" id="lzRangeHint" style="margin-bottom:6px"></div>
+        </div>
+        <label class="lz-chk"><input id="lzUseOutline" type="checkbox" checked> Thay viền ngoài bằng viền nhận diện</label>
+        <label class="lz-chk"><input id="lzUseUnits" type="checkbox" checked> Tạo căn hộ từ các vùng đang bật</label>
+        <label class="lz-chk"><input id="lzKeepImg" type="checkbox" checked> Giữ ảnh layout làm nền để chỉnh tay</label>
+        <div class="row" style="margin-top:10px"><button id="lzApply" class="primary">Dựng tòa</button><button id="lzCancel">Hủy</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const { polyCentroid, bbox, parseRanges, parseOverrides, polyArea } = Project3D.util;
+const KEY = 'project3d';
+const PALETTE = [['#0d9488', '#7dd3c0'], ['#2563eb', '#93c5fd'], ['#db2777', '#f9a8d4'], ['#ea580c', '#fdba74'], ['#7c3aed', '#c4b5fd'], ['#65a30d', '#bef264']];
+const $ = id => document.getElementById(id);
+const round = v => Math.round(v * 10) / 10;
+const uid = () => 't' + Math.random().toString(36).slice(2, 8);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// =====================================================================
+// STATE
+// =====================================================================
+let project = null;
+let sel = { towerId: null, plan: -1, unit: -1 };   // tòa + lát cắt + căn đang chọn
+let unitEdit = false;
+let alignMode = false;
+let soloPlan = true;
+let showDims = true;                        // thước kích thước (chiều ngang / chiều sâu) của mẫu đang chọn                        // mặt bằng chỉ hiện mẫu tầng đang chọn của tòa đang chọn
+// mẫu tầng này có đang bị ẩn trên mặt bằng không
+const planHidden = (t, i) => t.id === sel.towerId && i !== sel.plan && (soloPlan || t.plans[i].hide2d);
+let measureTarget = null;                   // 📏 Đo trên thẻ mẫu: chỉ co giãn mẫu đó
+let scaleAnchor = 'l';                      // co giãn mẫu: giữ mép trái (l) / giữa (c) / mép phải (r)                      // ✥ Canh: kéo trên mặt bằng chỉ dời mẫu tầng đang chọn                       // đang ở chế độ sửa căn hộ của lát cắt đang chọn
+let activeVertex = -1;
+let mode = 'select';                        // select | draw | measure
+let drawTarget = null;                      // {type:'newTower'} | {type:'addPlan',towerId} | {type:'replace',towerId,plan}
+let draft = [];                             // điểm đang vẽ
+let rectDrag = null, measurePts = [];
+let mouseW = null;                          // vị trí chuột (mét)
+let bgImg = null;
+const view = { scale: 3, ox: 40, oy: 40 };  // px/mét và độ lệch
+
+function towerById(id) { return project.towers.find(t => t.id === id); }
+function selTower() { return towerById(sel.towerId); }
+function selPlan() { const t = selTower(); return t && t.plans[sel.plan]; }
+function selUnit() { const p = selPlan(); return unitEdit && p && p.units ? p.units[sel.unit] : null; }
+// đa giác đang được sửa góc: căn đang chọn (khi sửa căn) hoặc lát cắt
+function editPoly() { if (unitEdit) return selUnit()?.polygon || null; return selPlan()?.polygon || null; }
+function setSel(towerId, plan = -1) { sel = { towerId, plan, unit: -1 }; unitEdit = false; activeVertex = -1; }
+// áp hàm biến đổi điểm cho mọi đa giác của tòa (lát cắt + căn)
+function mapTower(t, fn, onlyPlan = -1) {
+  t.plans.forEach((p, i) => {
+    if (onlyPlan >= 0 && i !== onlyPlan) return;
+    p.polygon = p.polygon.map(fn);
+    (p.units || []).forEach(u => u.polygon = u.polygon.map(fn));
+    if (p.layout) { // ảnh layout đi theo: suy ra dịch / co giãn / xoay từ hàm biến đổi
+      const L = p.layout, c0 = fn([L.cx, L.cy]), c1 = fn([L.cx + 100, L.cy]);
+      const k = Math.hypot(c1[0] - c0[0], c1[1] - c0[1]) / 100;
+      const ang = Math.atan2(c1[1] - c0[1], c1[0] - c0[0]) * 180 / Math.PI;
+      L.cx = c0[0]; L.cy = c0[1]; L.w *= k; L.h *= k;
+      L.rot = (L.rot || 0) + ang;
+      if (L.ref) { const o = fn([L.ref.ox, L.ref.oy]); L.ref.ox = o[0]; L.ref.oy = o[1]; L.ref.mpp *= k; L.ref.rot = (L.ref.rot || 0) + ang; }
+    }
+  });
+}
+function nextUnitNo(p) {
+  const n = Math.max(0, ...(p.units || []).map(u => parseInt(u.no, 10) || 0)) + 1;
+  return String(n).padStart(2, '0');
+}
+
+function loadProject(p) {
+  project = JSON.parse(JSON.stringify(p));
+  project.ground = Object.assign({ image: null, widthMeters: 300, heightMeters: 200 }, project.ground);
+  project.towers = (project.towers || []).map(t => Object.assign({ id: uid(), plans: [] }, t, { id: t.id || uid() }));
+  setSel(project.towers[0]?.id || null, project.towers[0]?.plans.length ? 0 : -1);
+  loadBgImage();
+  renderPanel();
+  fit();
+  history.list = [snapshot()]; history.i = 0; updateUndoBtns();
+  commit({ save: false, keepCamera: false });
+}
+
+// =====================================================================
+// HOÀN TÁC / LÀM LẠI (Ctrl+Z / Ctrl+Y)
+// Mỗi lần lưu (commit) chụp lại dự án. Ảnh (data:…) chỉ giữ 1 bản trong bể ảnh để đỡ tốn bộ nhớ.
+// =====================================================================
+const history = { list: [], i: -1, max: 80 };
+const imgPool = new Map(), imgIds = new Map();
+function snapshot() {
+  return JSON.stringify(project, (k, v) => {
+    if (typeof v === 'string' && v.length > 1000 && v.startsWith('data:')) {
+      let id = imgIds.get(v);
+      if (!id) { id = '@img:' + imgIds.size; imgIds.set(v, id); imgPool.set(id, v); }
+      return id;
+    }
+    return v;
+  });
+}
+const unsnapshot = str => JSON.parse(str, (k, v) => typeof v === 'string' && v.startsWith('@img:') && imgPool.has(v) ? imgPool.get(v) : v);
+function recordHistory() {
+  const s = snapshot();
+  if (history.list[history.i] === s) return;
+  history.list.length = history.i + 1;   // bỏ nhánh "làm lại"
+  history.list.push(s);
+  if (history.list.length > history.max) history.list.shift();
+  history.i = history.list.length - 1;
+  updateUndoBtns();
+}
+function updateUndoBtns() {
+  $('btnUndo').disabled = history.i <= 0;
+  $('btnRedo').disabled = history.i >= history.list.length - 1;
+}
+function stepHistory(d) {
+  const j = history.i + d;
+  if (j < 0 || j >= history.list.length) return;
+  history.i = j;
+  const oldImg = project.ground.image, keep = { ...sel }, wasUnit = unitEdit;
+  project = unsnapshot(history.list[j]);
+  // giữ tòa / lát cắt đang chọn nếu còn
+  const t = towerById(keep.towerId);
+  if (t) {
+    sel = { towerId: t.id, plan: Math.min(keep.plan, t.plans.length - 1), unit: -1 };
+    const p = t.plans[sel.plan];
+    unitEdit = wasUnit && !!p?.units?.length;
+    if (unitEdit) sel.unit = Math.min(keep.unit, p.units.length - 1);
+  } else setSel(project.towers[0]?.id || null, project.towers[0]?.plans.length ? 0 : -1);
+  activeVertex = -1; drag = null;
+  if (mode !== 'select') setMode('select');
+  if (project.ground.image !== oldImg) loadBgImage();
+  renderPanel();
+  commit({ record: false });
+  updateUndoBtns();
+  $('saveState').textContent = (d < 0 ? 'Đã hoàn tác' : 'Đã làm lại') + ' · ' + $('saveState').textContent;
+}
+$('btnUndo').onclick = () => stepHistory(-1);
+$('btnRedo').onclick = () => stepHistory(1);
+
+function loadBgImage() {
+  bgImg = null;
+  if (!project.ground.image) { draw(); return; }
+  const img = new Image();
+  img.onload = () => { bgImg = img; draw(); };
+  img.src = project.ground.image;
+}
+
+// =====================================================================
+// LƯU + XEM TRƯỚC
+// =====================================================================
+let previewTimer = null, firstPreview = true;
+function commit({ save = true, keepCamera = true, record = save } = {}) {
+  draw();
+  if (record) recordHistory();
+  if (save) {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(project));
+      $('saveState').textContent = 'Đã lưu vào trình duyệt ' + new Date().toLocaleTimeString('vi-VN');
+      $('saveState').className = '';
+    } catch {
+      $('saveState').textContent = 'Không lưu được vào trình duyệt (ảnh nền quá lớn) — hãy bấm Xuất JSON';
+      $('saveState').className = 'err';
+    }
+  }
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => {
+    preview.load(project, { keepCamera: keepCamera && !firstPreview });
+    firstPreview = false;
+  }, 250);
+}
+
+const preview = Project3D.create(THREE, { OrbitControls, CSS2DRenderer, CSS2DObject }, $('preview'), { compact: true });
+$('btnPvBig').onclick = () => {
+  const big = $('previewWrap').classList.toggle('big');
+  $('btnPvBig').textContent = big ? 'Thu nhỏ' : 'Phóng to';
+  $('preview').classList.toggle('p3d-compact', !big);
+};
+$('btnPvTower').onclick = () => { const t = selTower(); if (t) preview.select(t.code); };
+
+// =====================================================================
+// CANVAS 2D
+// =====================================================================
+const cv = $('plan'), ctx = cv.getContext('2d');
+const toS = ([x, y]) => [x * view.scale + view.ox, y * view.scale + view.oy];
+const toW = (sx, sy) => [(sx - view.ox) / view.scale, (sy - view.oy) / view.scale];
+
+function resizeCanvas() {
+  const r = cv.getBoundingClientRect(), dpr = Math.min(devicePixelRatio, 2);
+  cv.width = r.width * dpr; cv.height = r.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+new ResizeObserver(resizeCanvas).observe(cv);
+
+function fit() {
+  const r = cv.getBoundingClientRect();
+  if (!r.width) return;
+  let [x0, y0, x1, y1] = [0, 0, project.ground.widthMeters, project.ground.heightMeters];
+  for (const t of project.towers) for (const p of t.plans) {
+    const b = bbox(p.polygon); x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]); x1 = Math.max(x1, b[2]); y1 = Math.max(y1, b[3]);
+  }
+  const pad = 60;
+  view.scale = Math.min((r.width - pad * 2) / (x1 - x0), (r.height - pad * 2 - 30) / (y1 - y0));
+  view.ox = (r.width - (x1 - x0) * view.scale) / 2 - x0 * view.scale;
+  view.oy = (r.height - 30 - (y1 - y0) * view.scale) / 2 - y0 * view.scale;
+  draw();
+}
+
+function pathPoly(poly) {
+  ctx.beginPath();
+  poly.forEach((p, i) => { const [x, y] = toS(p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.closePath();
+}
+
+function niceStep(px) { // bước lưới sao cho ~px pixel
+  const m = px / view.scale, p = Math.pow(10, Math.floor(Math.log10(m)));
+  return [1, 2, 5, 10].map(k => k * p).find(s => s >= m);
+}
+
+function draw() {
+  if (!project) return;
+  const r = cv.getBoundingClientRect(), W = project.ground.widthMeters, H = project.ground.heightMeters;
+  ctx.clearRect(0, 0, r.width, r.height);
+
+  // vùng mặt bằng + ảnh nền
+  const [gx, gy] = toS([0, 0]);
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(gx, gy, W * view.scale, H * view.scale);
+  if (bgImg) ctx.drawImage(bgImg, gx, gy, W * view.scale, H * view.scale);
+
+  // lưới
+  const step = niceStep(40), [wx0, wy0] = toW(0, 0), [wx1, wy1] = toW(r.width, r.height);
+  ctx.lineWidth = 1;
+  for (let x = Math.floor(wx0 / step) * step; x <= wx1; x += step) {
+    const sx = Math.round(x * view.scale + view.ox) + .5;
+    ctx.strokeStyle = Math.round(x / step) % 5 === 0 ? 'rgba(100,116,139,.28)' : 'rgba(100,116,139,.12)';
+    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, r.height); ctx.stroke();
+  }
+  for (let y = Math.floor(wy0 / step) * step; y <= wy1; y += step) {
+    const sy = Math.round(y * view.scale + view.oy) + .5;
+    ctx.strokeStyle = Math.round(y / step) % 5 === 0 ? 'rgba(100,116,139,.28)' : 'rgba(100,116,139,.12)';
+    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(r.width, sy); ctx.stroke();
+  }
+  ctx.strokeStyle = '#94a3b8'; ctx.setLineDash([6, 4]);
+  ctx.strokeRect(gx, gy, W * view.scale, H * view.scale);
+  ctx.setLineDash([]);
+
+  // ảnh layout của lát cắt đang chọn (nền để chỉnh tay)
+  const lp = selPlan();
+  if (lp?.layout && !lp.layout.hidden) drawLayoutUnder(lp.layout);
+
+  // các tòa: lát cắt thấp vẽ trước, cao vẽ sau
+  for (const t of project.towers) {
+    const isSel = t.id === sel.towerId;
+    const order = t.plans.map((p, i) => [p, i]).sort((a, b) => a[0].floorFrom - b[0].floorFrom);
+    for (const [p, i] of order) {
+      const isSelPlan = isSel && i === sel.plan;
+      if (planHidden(t, i)) {   // mẫu khác đang ẩn: khi ✥ Canh thì vẽ nét đứt mờ để canh theo
+        if (alignMode) { pathPoly(p.polygon); ctx.setLineDash([6, 4]); ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(15,23,42,.45)'; ctx.stroke(); ctx.setLineDash([]); }
+        continue;
+      }
+      pathPoly(p.polygon);
+      ctx.fillStyle = t.color + (isSelPlan ? '66' : isSel ? '3a' : '26');
+      ctx.fill();
+      ctx.lineWidth = isSelPlan ? 2.5 : isSel ? 1.6 : 1.1;
+      ctx.strokeStyle = t.color;
+      if (!isSelPlan && isSel) ctx.setLineDash([5, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // nhãn
+    const top = t.plans.reduce((a, p) => (!a || p.floorTo > a.floorTo ? p : a), null);
+    if (top && !(unitEdit && isSel)) {
+      const [sx, sy] = toS(polyCentroid(top.polygon));
+      ctx.font = '600 13px system-ui, sans-serif';
+      const label = `${t.code} · ${t.floors}T`;
+      const w = ctx.measureText(label).width + 14;
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = t.color; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(sx - w / 2, sy - 11, w, 22, 11); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#0f172a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, sx, sy + 1);
+    }
+  }
+
+  // thước kích thước của mẫu đang chọn: chiều ngang (= ô "Chiều ngang" trên thẻ mẫu) và chiều sâu
+  const sp = selPlan();
+  if (showDims && sp) drawDims(sp.polygon);
+
+  // căn hộ của lát cắt đang chọn
+  if (sp) drawUnits(selTower(), sp);
+
+  // đỉnh của đa giác đang sửa
+  const ep = editPoly();
+  if (ep && mode === 'select') {
+    const col = unitEdit ? '#dc2626' : selTower().color;
+    ep.forEach((p, i) => {
+      const [x, y] = toS(p);
+      ctx.fillStyle = i === activeVertex ? col : '#fff';
+      ctx.strokeStyle = col; ctx.lineWidth = 2;
+      ctx.fillRect(x - 5, y - 5, 10, 10); ctx.strokeRect(x - 5, y - 5, 10, 10);
+    });
+  }
+  if (snapMark && (mode === 'draw' || drag?.type === 'vertex')) {
+    const [x, y] = toS(snapMark);
+    ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // nét đang vẽ
+  if (mode === 'draw') {
+    ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2; ctx.fillStyle = 'rgba(37,99,235,.15)';
+    if (rectDrag?.active && mouseW) {
+      const poly = rectPoly(rectDrag.start, mouseW);
+      pathPoly(poly); ctx.fill(); ctx.stroke();
+      sizeLabel(poly);
+    } else if (draft.length) {
+      ctx.beginPath();
+      [...draft, ...(mouseW ? [mouseW] : [])].forEach((p, i) => { const [x, y] = toS(p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+      ctx.stroke();
+      draft.forEach((p, i) => {
+        const [x, y] = toS(p);
+        ctx.beginPath(); ctx.arc(x, y, i === 0 ? 6 : 4, 0, Math.PI * 2);
+        ctx.fillStyle = i === 0 ? '#2563eb' : '#fff'; ctx.fill(); ctx.stroke();
+      });
+      if (mouseW) { const a = draft[draft.length - 1]; edgeLabel(a, mouseW); }
+    }
+  }
+  if (mode === 'measure' && measurePts.length) {
+    const pts = [...measurePts, ...(measurePts.length === 1 && mouseW ? [mouseW] : [])];
+    ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+    ctx.beginPath(); pts.forEach((p, i) => { const [x, y] = toS(p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    ctx.setLineDash([]);
+    if (pts.length === 2) edgeLabel(pts[0], pts[1]);
+  }
+
+  // thước tỉ lệ
+  const len = niceStep(120), px = len * view.scale, by = r.height - 78;
+  ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillRect(10, by - 18, px + 20, 28);
+  ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(20, by); ctx.lineTo(20 + px, by); ctx.moveTo(20, by - 5); ctx.lineTo(20, by + 5); ctx.moveTo(20 + px, by - 5); ctx.lineTo(20 + px, by + 5); ctx.stroke();
+  ctx.fillStyle = '#0f172a'; ctx.font = '11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText(len + ' m', 20 + px / 2, by - 3);
+
+  updateHint();
+}
+
+function drawDims(poly) {
+  const [x0, y0, x1, y1] = bbox(poly), [a, b] = toS([x0, y0]), [c, d] = toS([x1, y1]);
+  const col = '#0f172a', gap = 26;
+  const tick = (x, y, vert) => { ctx.beginPath(); if (vert) { ctx.moveTo(x - 5, y + 5); ctx.lineTo(x + 5, y - 5); } else { ctx.moveTo(x - 5, y + 5); ctx.lineTo(x + 5, y - 5); } ctx.stroke(); };
+  const label = (txt, x, y, rot) => {
+    ctx.save(); ctx.translate(x, y); if (rot) ctx.rotate(-Math.PI / 2);
+    ctx.font = '600 12px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const w = ctx.measureText(txt).width + 12;
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = col; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(-w / 2, -10, w, 20, 5); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = col; ctx.fillText(txt, 0, 1); ctx.restore();
+  };
+  ctx.save();
+  ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.setLineDash([]);
+  // chiều ngang: đường phía trên + 2 vạch gióng xuống mép trái / phải
+  const yl = b - gap;
+  ctx.beginPath(); ctx.moveTo(a, b - 4); ctx.lineTo(a, yl - 6); ctx.moveTo(c, b - 4); ctx.lineTo(c, yl - 6); ctx.moveTo(a, yl); ctx.lineTo(c, yl); ctx.stroke();
+  tick(a, yl); tick(c, yl);
+  label(`Chiều ngang ${(x1 - x0).toFixed(1)} m`, (a + c) / 2, yl);
+  // chiều sâu: đường bên trái
+  const xl = a - gap;
+  ctx.beginPath(); ctx.moveTo(a - 4, b); ctx.lineTo(xl - 6, b); ctx.moveTo(a - 4, d); ctx.lineTo(xl - 6, d); ctx.moveTo(xl, b); ctx.lineTo(xl, d); ctx.stroke();
+  tick(xl, b, true); tick(xl, d, true);
+  label(`${(y1 - y0).toFixed(1)} m`, xl, (b + d) / 2, true);
+  // điểm đứng yên khi co giãn (theo ô "giữ mép …" trên thẻ mẫu)
+  const ax = scaleAnchor === 'r' ? c : scaleAnchor === 'c' ? (a + c) / 2 : a, ay = yl;   // chấm cam nằm trên đường thước
+  ctx.fillStyle = '#f59e0b'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(ax, ay, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+function drawUnits(t, p) {
+  const units = p.units || [];
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (!units.length) {
+    // chưa vẽ căn → xem trước cách chia tự động (nét đứt)
+    if (!t.unitsPerFloor) return;
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(15,23,42,.35)'; ctx.lineWidth = 1;
+    Project3D.util.unitCells(p.polygon, t.unitsPerFloor).forEach(c => { pathPoly(c); ctx.stroke(); });
+    ctx.setLineDash([]);
+    return;
+  }
+  units.forEach((u, i) => {
+    const isSel = unitEdit && i === sel.unit;
+    pathPoly(u.polygon);
+    ctx.fillStyle = isSel ? 'rgba(220,38,38,.22)' : unitEdit ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.3)';
+    ctx.fill();
+    ctx.strokeStyle = isSel ? '#dc2626' : 'rgba(15,23,42,.6)'; ctx.lineWidth = isSel ? 2 : 1;
+    ctx.stroke();
+    // phần mặt tiền của căn (sẽ sáng đỏ trong 3D khi rê chuột)
+    const segs = Project3D.util.facadeSegments(p.polygon, u.polygon);
+    if (isSel || unitEdit) {
+      ctx.strokeStyle = isSel ? '#ff2600' : 'rgba(255,38,0,.35)'; ctx.lineWidth = isSel ? 5 : 3;
+      segs.forEach(({ a, b }) => { const A = toS(a), B = toS(b); ctx.beginPath(); ctx.moveTo(...A); ctx.lineTo(...B); ctx.stroke(); });
+    }
+    const [cx, cy] = toS(polyCentroid(u.polygon));
+    ctx.font = `600 ${Math.max(9, Math.min(13, view.scale * 2.2))}px system-ui`;
+    ctx.fillStyle = segs.length ? '#0f172a' : '#dc2626';
+    ctx.fillText(u.no + (segs.length ? '' : ' ⚠'), cx, cy);
+  });
+}
+
+function edgeLabel(a, b) {
+  const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const [x, y] = toS([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+  ctx.font = '600 12px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const s = d.toFixed(1) + ' m', w = ctx.measureText(s).width + 10;
+  ctx.fillStyle = '#0f172a'; ctx.fillRect(x - w / 2, y - 18, w, 18);
+  ctx.fillStyle = '#fff'; ctx.fillText(s, x, y - 9);
+}
+function sizeLabel(poly) {
+  const [x0, y0, x1, y1] = bbox(poly);
+  edgeLabel([x0, y0], [x1, y0]); edgeLabel([x1, y0], [x1, y1]);
+}
+function rectPoly(a, b) {
+  const [x0, x1] = [Math.min(a[0], b[0]), Math.max(a[0], b[0])].map(round);
+  const [y0, y1] = [Math.min(a[1], b[1]), Math.max(a[1], b[1])].map(round);
+  return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+}
+
+function updateHint() {
+  let h;
+  if (mode === 'draw') {
+    const what = { newTower: 'tòa mới', addPlan: 'lát cắt mới', addUnit: 'căn hộ mới', replace: 'lại lát cắt' }[drawTarget?.type] || '';
+    h = draft.length
+      ? `Đang vẽ ${what}: bấm thêm góc · bấm vào điểm đầu, nhấp đúp hoặc Enter để xong · Backspace xóa điểm cuối · Esc hủy`
+      : `Vẽ ${what}: bấm từng góc của tòa trên mặt bằng, hoặc kéo chuột để vẽ hình chữ nhật · Esc hủy`;
+  } else if (mode === 'measure') {
+    h = measurePts.length ? 'Bấm điểm thứ 2' : measureTarget ? 'ĐO MẪU TẦNG: bấm 2 điểm của một đoạn đã biết kích thước trên ảnh layout (vd hai đầu đường kích thước, cạnh một căn), rồi nhập số mét — chỉ mẫu này được co giãn · Esc hủy' : 'Đo tỉ lệ: bấm 2 điểm trên ảnh mà bạn biết khoảng cách thực (ví dụ chiều dài một cạnh đường), rồi nhập số mét';
+  } else if (unitEdit) {
+    h = 'SỬA CĂN: bấm vào căn để chọn · kéo căn để di chuyển · kéo ô vuông để sửa góc (tự hít vào góc/cạnh, giữ Alt để tắt) · nhấp đúp lên cạnh để thêm góc · Delete xóa · Esc thoát. Nét đỏ = phần mặt tiền của căn.';
+  } else {
+    h = 'Bấm vào tòa để chọn · kéo để di chuyển cả tòa (giữ Alt: chỉ lát cắt) · kéo ô vuông để sửa góc · nhấp đúp lên cạnh để thêm góc · Delete xóa góc/lát cắt · cuộn để zoom · kéo nền để di chuyển';
+  }
+  $('hintBar').textContent = h;
+  document.querySelectorAll('#toolbar [data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  $('btnDrawTower').classList.toggle('on', mode === 'draw' && drawTarget?.type === 'newTower');
+}
+
+// ---- hit test
+function pointInPoly([x, y], poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function hitPlan(w) {
+  // đang ✥ Canh: bấm trúng mẫu đang canh thì giữ đúng mẫu đó (không nhảy sang mẫu chồng bên dưới)
+  if (alignMode) { const t = selTower(), p = selPlan(); if (p && pointInPoly(w, p.polygon)) return { t, i: sel.plan, p }; }
+  const hits = [];
+  for (const t of project.towers) t.plans.forEach((p, i) => { if (!planHidden(t, i) && pointInPoly(w, p.polygon)) hits.push({ t, i, p }); });
+  if (!hits.length) return null;
+  hits.sort((a, b) => (b.t.id === sel.towerId) - (a.t.id === sel.towerId) || b.p.floorTo - a.p.floorTo);
+  // bấm lại cùng tòa → lần lượt chuyển qua các lát cắt chồng nhau
+  const same = hits.filter(h => h.t.id === sel.towerId);
+  if (same.length > 1) {
+    const k = same.findIndex(h => h.i === sel.plan);
+    if (k >= 0) return same[(k + 1) % same.length];
+  }
+  return hits[0];
+}
+function hitVertex(sx, sy) {
+  const poly = editPoly(); if (!poly) return -1;
+  return poly.findIndex(v => { const [x, y] = toS(v); return Math.abs(x - sx) < 8 && Math.abs(y - sy) < 8; });
+}
+function hitUnit(w) {
+  const p = selPlan(); if (!p || !p.units) return -1;
+  return p.units.findIndex(u => pointInPoly(w, u.polygon));
+}
+// Tự hít vào góc / cạnh của tòa đang chọn (để căn khớp đúng viền lát cắt)
+let snapMark = null;
+function snapPt(w, sx, sy, skip, noSnap) {
+  snapMark = null;
+  const t = selTower();
+  if (!t || noSnap) return w.map(round);
+  const polys = [];
+  for (const p of t.plans) { polys.push(p.polygon); (p.units || []).forEach(u => polys.push(u.polygon)); }
+  let best = null;
+  for (const poly of polys) poly.forEach((v, i) => {
+    if (poly === skip?.poly && i === skip.i) return;
+    const [x, y] = toS(v), d = Math.hypot(x - sx, y - sy);
+    if (d < 10 && (!best || d < best.d)) best = { d, pt: v.slice() };
+  });
+  if (!best) for (const poly of polys) poly.forEach((a, i) => {
+    if (poly === skip?.poly && (i === skip.i || (i + 1) % poly.length === skip.i)) return;
+    const b = poly[(i + 1) % poly.length];
+    const [ax, ay] = toS(a), [bx, by] = toS(b);
+    const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy || 1;
+    const k = Math.max(0, Math.min(1, ((sx - ax) * dx + (sy - ay) * dy) / L));
+    const d = Math.hypot(ax + k * dx - sx, ay + k * dy - sy);
+    if (d < 7 && (!best || d < best.d)) best = { d, pt: [round(a[0] + k * (b[0] - a[0])), round(a[1] + k * (b[1] - a[1]))] };
+  });
+  if (best) { snapMark = best.pt; return best.pt; }
+  return w.map(round);
+}
+function hitEdge(sx, sy) {
+  const poly = editPoly(); if (!poly) return null;
+  const p = { polygon: poly };
+  let best = null;
+  p.polygon.forEach((a, i) => {
+    const b = p.polygon[(i + 1) % p.polygon.length];
+    const [ax, ay] = toS(a), [bx, by] = toS(b);
+    const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy || 1;
+    const k = Math.max(0, Math.min(1, ((sx - ax) * dx + (sy - ay) * dy) / L));
+    const d = Math.hypot(ax + k * dx - sx, ay + k * dy - sy);
+    if (d < 8 && (!best || d < best.d)) best = { d, i, pt: [round(a[0] + k * (b[0] - a[0])), round(a[1] + k * (b[1] - a[1]))] };
+  });
+  return best;
+}
+
+// ---- chuột
+let drag = null;
+const evPos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  const [sx, sy] = evPos(e), w = toW(sx, sy);
+  if (e.button !== 0) { drag = { type: 'pan', sx, sy }; return; }
+
+  if (mode === 'draw') {
+    const pt = snapPt(w, sx, sy, null, e.altKey);
+    if (draft.length >= 3) {
+      const [fx, fy] = toS(draft[0]);
+      if (Math.hypot(fx - sx, fy - sy) < 10) { finishDraw(draft); return; }
+    }
+    if (!draft.length) rectDrag = { start: pt, sx, sy, active: false };
+    else draft.push(pt);
+    draw();
+    return;
+  }
+  if (mode === 'measure') {
+    measurePts.push(w);
+    if (measurePts.length === 2) setTimeout(finishMeasure, 10);
+    draw();
+    return;
+  }
+  // select
+  const vi = hitVertex(sx, sy);
+  if (vi >= 0) { activeVertex = vi; drag = { type: 'vertex', i: vi, poly: editPoly(), moved: false }; draw(); return; }
+
+  if (unitEdit) {
+    // chế độ sửa căn: chỉ chọn / kéo căn trong lát cắt đang chọn
+    const ui = hitUnit(w);
+    activeVertex = -1;
+    if (ui >= 0) {
+      sel.unit = ui;
+      drag = { type: 'moveUnit', start: w, moved: false, orig: selPlan().units[ui].polygon.map(v => v.slice()) };
+    } else drag = { type: 'pan', sx, sy };
+    renderPanel(); draw();
+    return;
+  }
+
+  const hit = hitPlan(w);
+  if (hit) {
+    const changedTower = hit.t.id !== sel.towerId;
+    setSel(hit.t.id, hit.i);
+    const whole = !e.altKey && !(alignMode && hit.i === sel.plan);
+    drag = { type: 'move', start: w, whole, moved: false, orig: JSON.parse(JSON.stringify(hit.t.plans)) };
+    renderPanel();
+    if (changedTower) preview.select(hit.t.code);
+    draw();
+    return;
+  }
+  activeVertex = -1;
+  drag = { type: 'pan', sx, sy };
+  draw();
+});
+
+cv.addEventListener('pointermove', e => {
+  const [sx, sy] = evPos(e);
+  const raw = toW(sx, sy);
+  mouseW = raw;
+  $('coord').textContent = `x ${raw[0].toFixed(1)} m · y ${raw[1].toFixed(1)} m`;
+  if (mode === 'draw') mouseW = snapPt(raw, sx, sy, null, e.altKey);
+  if (rectDrag && !rectDrag.active && Math.hypot(sx - rectDrag.sx, sy - rectDrag.sy) > 6) rectDrag.active = true;
+  if (drag?.type === 'pan') {
+    view.ox += sx - drag.sx; view.oy += sy - drag.sy; drag.sx = sx; drag.sy = sy;
+  } else if (drag?.type === 'vertex') {
+    drag.poly[drag.i] = snapPt(raw, sx, sy, { poly: drag.poly, i: drag.i }, e.altKey); drag.moved = true;
+  } else if (drag?.type === 'move') {
+    const dx = round(raw[0] - drag.start[0]), dy = round(raw[1] - drag.start[1]);
+    const t = selTower();
+    const mv = ([x, y]) => [round(x + dx), round(y + dy)];
+    t.plans.forEach((p, i) => {
+      if (!drag.whole && i !== sel.plan) return;
+      p.polygon = drag.orig[i].polygon.map(mv);
+      if (p.units) p.units.forEach((u, k) => u.polygon = drag.orig[i].units[k].polygon.map(mv));
+      if (p.layout) {
+        p.layout.cx = drag.orig[i].layout.cx + dx; p.layout.cy = drag.orig[i].layout.cy + dy;
+        if (p.layout.ref) { p.layout.ref.ox = drag.orig[i].layout.ref.ox + dx; p.layout.ref.oy = drag.orig[i].layout.ref.oy + dy; }
+      }
+    });
+    drag.moved = drag.moved || dx !== 0 || dy !== 0;
+  } else if (drag?.type === 'moveUnit') {
+    const dx = round(raw[0] - drag.start[0]), dy = round(raw[1] - drag.start[1]);
+    selUnit().polygon = drag.orig.map(([x, y]) => [round(x + dx), round(y + dy)]);
+    drag.moved = drag.moved || dx !== 0 || dy !== 0;
+  }
+  draw();
+});
+
+cv.addEventListener('pointerup', () => {
+  if (mode === 'draw' && rectDrag) {
+    if (rectDrag.active && mouseW) {
+      const poly = rectPoly(rectDrag.start, mouseW);
+      rectDrag = null;
+      if (Math.abs(poly[1][0] - poly[0][0]) > .5 && Math.abs(poly[2][1] - poly[1][1]) > .5) finishDraw(poly);
+    } else {
+      draft.push(rectDrag.start);
+      rectDrag = null;
+    }
+    draw();
+  }
+  if (drag && drag.type !== 'pan' && drag.moved) { commit(); renderPanel(); }
+  drag = null;
+  snapMark = null;
+});
+
+cv.addEventListener('dblclick', e => {
+  const [sx, sy] = evPos(e);
+  if (mode === 'draw') {
+    // nhấp đúp tạo ra điểm trùng → bỏ đi rồi kết thúc
+    const pts = draft.filter((p, i) => i === 0 || Math.hypot(p[0] - draft[i - 1][0], p[1] - draft[i - 1][1]) > .3);
+    if (pts.length >= 3) finishDraw(pts);
+    return;
+  }
+  if (mode === 'select') {
+    const ed = hitEdge(sx, sy);
+    if (ed && hitVertex(sx, sy) < 0) {
+      editPoly().splice(ed.i + 1, 0, ed.pt);
+      activeVertex = ed.i + 1;
+      commit();
+    }
+  }
+});
+
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const [sx, sy] = evPos(e), before = toW(sx, sy);
+  view.scale = Math.min(80, Math.max(.2, view.scale * Math.exp(-e.deltaY * .0015)));
+  view.ox = sx - before[0] * view.scale; view.oy = sy - before[1] * view.scale;
+  draw();
+}, { passive: false });
+
+window.addEventListener('keydown', e => {
+  const z = (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'z';
+  const y = (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'y';
+  if (!$('lzModal').hidden) {
+    if (!lzMenu.hidden && e.key === 'Escape') { lzHideMenu(); return; }
+    if (LZ.cmpMode && !e.target.matches('input, select')) {
+      if (e.key === 'Escape' || e.key === 'Enter') { lzCmpEnd(true); return; }
+      if (e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        const st = (e.shiftKey ? 10 : 1) / LZ.view.k;
+        lzCmpMove(e.key === 'ArrowLeft' ? -st : e.key === 'ArrowRight' ? st : 0, e.key === 'ArrowUp' ? -st : e.key === 'ArrowDown' ? st : 0);
+        return;
+      }
+    }
+    if (z && !e.shiftKey && !e.target.matches('input')) { e.preventDefault(); lzUndo(); return; }
+    if (LZ.drawPts) {
+      if (e.key === 'Escape') { LZ.drawPts = null; lzMsg(''); lzRender(); }
+      else if (e.key === 'Enter') lzFinishDraw();
+      else if (e.key === 'Backspace') { e.preventDefault(); LZ.drawPts.pop(); lzRender(); }
+      return;
+    }
+    if (e.key === 'Escape') {
+      if (LZ.unitMode) lzSetUnitMode(false);
+      else if (LZ.cropMode) lzSetCrop(false);
+      else if (LZ.editOutline) lzSetEditOutline(false);
+      else lzClose();
+    }
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.matches('input')) {
+      const u = LZ.mu?.find(x => x.id === LZ.selMU);
+      if (u && LZ.activeMV >= 0) { e.preventDefault(); lzDelMUVertex(u, LZ.activeMV); }
+      else if (LZ.activeV >= 0) { e.preventDefault(); lzDelVertex(LZ.activeV); }
+      else if (u) { e.preventDefault(); lzDelMU(u); }
+    }
+    return;
+  }
+  if (e.target.matches('input, select, textarea')) return;   // ô nhập: để trình duyệt tự hoàn tác chữ
+  if (z || y) {
+    e.preventDefault();
+    if (drag) return;
+    if (mode === 'draw' && draft.length && z && !e.shiftKey) { draft.pop(); draw(); return; }
+    stepHistory(z && !e.shiftKey ? -1 : 1);
+    return;
+  }
+  if (e.key === 'Escape') {
+    if (mode !== 'select') setMode('select');
+    else if (unitEdit) { unitEdit = false; sel.unit = -1; activeVertex = -1; renderPanel(); draw(); }
+    return;
+  }
+  if (mode === 'draw') {
+    if (e.key === 'Enter' && draft.length >= 3) finishDraw(draft);
+    if (e.key === 'Backspace') { draft.pop(); draw(); e.preventDefault(); }
+    return;
+  }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    const p = selPlan(), poly = editPoly(); if (!p) return;
+    e.preventDefault();
+    if (activeVertex >= 0 && poly) {
+      if (poly.length <= 3) return alert('Đa giác phải có ít nhất 3 góc.');
+      poly.splice(activeVertex, 1); activeVertex = -1; commit();
+    } else if (unitEdit) { if (sel.unit >= 0) deleteUnit(sel.unit); }
+    else deletePlan(sel.plan);
+  }
+  if (alignMode && e.key.startsWith('Arrow') && selPlan()) {   // nhích mẫu đang canh
+    e.preventDefault();
+    const st = e.shiftKey ? 1 : .1, dx = e.key === 'ArrowLeft' ? -st : e.key === 'ArrowRight' ? st : 0, dy = e.key === 'ArrowUp' ? -st : e.key === 'ArrowDown' ? st : 0;
+    mapTower(selTower(), ([x, y]) => [round(x + dx), round(y + dy)], sel.plan);
+    commit(); return;
+  }
+  if (e.key === 'v' || e.key === 'V') setMode('select');
+  if (e.key === 'n' || e.key === 'N') startDraw({ type: 'newTower' });
+  if (e.key === 'f' || e.key === 'F') fit();
+});
+
+// ---- chế độ
+function setMode(m) {
+  mode = m; draft = []; rectDrag = null; measurePts = []; measureTarget = null;
+  if (m !== 'draw') drawTarget = null;
+  cv.style.cursor = m === 'select' ? 'default' : 'crosshair';
+  draw();
+}
+function startDraw(target) { setMode('draw'); drawTarget = target; draw(); }
+document.querySelectorAll('#toolbar [data-mode]').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+$('btnDrawTower').onclick = $('btnAddTower').onclick = () => startDraw({ type: 'newTower' });
+$('btnFit').onclick = fit;
+$('btnDims').onclick = () => { showDims = !showDims; $('btnDims').classList.toggle('on', showDims); renderPanel(); draw(); };
+
+function finishDraw(poly) {
+  poly = poly.map(p => p.map(round));
+  if (poly.length < 3) return;
+  const target = drawTarget || { type: 'newTower' };
+  if (target.type === 'newTower') {
+    const n = project.towers.length;
+    const [color, roofColor] = PALETTE[n % PALETTE.length];
+    let k = n + 1; while (project.towers.some(t => t.code === 'T' + k)) k++;
+    const t = { id: uid(), code: 'T' + k, color, roofColor, floors: 20, floorHeight: 3.2, floorHeightOverrides: {}, unitsPerFloor: 8, nonSaleFloors: '', plans: [{ floorFrom: 1, floorTo: 20, polygon: poly }] };
+    project.towers.push(t);
+    setSel(t.id, 0);
+  } else {
+    const t = towerById(target.towerId);
+    if (target.type === 'addPlan') {
+      const from = Math.min(t.floors, Math.max(1, ...t.plans.map(p => p.floorTo + 1)));
+      t.plans.push({ floorFrom: from, floorTo: t.floors, polygon: poly });
+      setSel(t.id, t.plans.length - 1);
+    } else if (target.type === 'addUnit') {
+      const p = t.plans[target.plan];
+      p.units = p.units || [];
+      p.units.push({ no: nextUnitNo(p), polygon: poly });
+      sel = { towerId: t.id, plan: target.plan, unit: p.units.length - 1 };
+      unitEdit = true;
+    } else {
+      t.plans[target.plan].polygon = poly;
+      setSel(t.id, target.plan);
+    }
+  }
+  setMode('select');
+  renderPanel();
+  commit();
+}
+
+function finishMeasure() {
+  const [a, b] = measurePts, target = measureTarget;
+  const cur = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const v = prompt(`Đoạn vừa đo đang là ${cur.toFixed(2)} m theo tỉ lệ hiện tại.\nKhoảng cách thực tế là bao nhiêu mét?` + (target ? '\n(Chỉ co giãn riêng mẫu tầng này)' : ''));
+  setMode('select');
+  const real = parseFloat(String(v).replace(',', '.'));
+  if (!(real > 0) || cur < .01) return;
+  if (target) {   // co giãn riêng mẫu, giữ điểm đầu đứng yên
+    const t = towerById(target.towerId), k = real / cur;
+    if (!t?.plans[target.plan]) return;
+    mapTower(t, ([x, y]) => [round(a[0] + (x - a[0]) * k), round(a[1] + (y - a[1]) * k)], target.plan);
+    setSel(t.id, target.plan); renderPanel(); commit();
+    return;
+  }
+  rescaleAll(real / cur);
+}
+// co giãn đều một mẫu tầng (viền + căn + ảnh layout) theo chiều ngang mới
+function scalePlanTo(t, i, newW) {
+  const p = t.plans[i], [x0, y0, x1, y1] = bbox(p.polygon), w = x1 - x0;
+  if (!(newW > 0) || w < .01) return;
+  const k = newW / w;
+  const ax = scaleAnchor === 'r' ? x1 : scaleAnchor === 'c' ? (x0 + x1) / 2 : x0, ay = scaleAnchor === 'c' ? (y0 + y1) / 2 : y0;
+  mapTower(t, ([x, y]) => [round(ax + (x - ax) * k), round(ay + (y - ay) * k)], i);
+}
+
+// Co giãn toàn bộ (ảnh nền + tất cả tòa) — dùng khi chỉnh tỉ lệ
+function rescaleAll(f) {
+  project.ground.widthMeters = round(project.ground.widthMeters * f);
+  project.ground.heightMeters = round(project.ground.heightMeters * f);
+  for (const t of project.towers) mapTower(t, ([x, y]) => [round(x * f), round(y * f)]);
+  view.scale /= f;
+  renderPanel();
+  commit({ keepCamera: false });
+  firstPreview = true;
+}
+
+// =====================================================================
+// PANEL BÊN PHẢI
+// =====================================================================
+function renderPanel() {
+  $('pName').value = project.project || '';
+  $('pW').value = project.ground.widthMeters;
+  $('pH').value = project.ground.heightMeters;
+  $('pNorth').value = project.ground.northDeg || 0;
+  $('imgInfo').textContent = project.ground.image
+    ? 'Đã có ảnh nền. Nếu tỉ lệ chưa đúng, dùng "📏 Đo tỉ lệ" trên thanh công cụ.'
+    : 'Chưa có ảnh nền — vẫn vẽ được trên lưới. Tải ảnh masterplan để vẽ theo cho chính xác.';
+
+  $('towerList').innerHTML = project.towers.length
+    ? project.towers.map(t => `<div class="towerItem ${t.id === sel.towerId ? 'sel' : ''}" data-id="${t.id}"><i style="background:${esc(t.color)}"></i><span><b>${esc(t.code)}</b> · ${t.floors} tầng · ${t.plans.length} lát cắt</span></div>`).join('')
+    : '<div class="empty">Chưa có tòa nào. Bấm "＋ Vẽ tòa mới" rồi vẽ trên mặt bằng.</div>';
+
+  const t = selTower();
+  if (!t) { $('towerSec').innerHTML = ''; return; }
+  const ov = Object.entries(parseOverrides(t.floorHeightOverrides)).map(([k, v]) => `${k}:${v}`).join(', ');
+  $('towerSec').innerHTML = `
+    <h2>Tòa ${esc(t.code)} <button class="danger" id="btnDelTower">Xóa tòa</button></h2>
+    <div class="grid2">
+      <label>Mã tòa<input data-f="code" value="${esc(t.code)}"></label>
+      <label>Số tầng<input data-f="floors" type="number" min="1" max="120" value="${t.floors}"></label>
+      <label>Màu tòa<input data-f="color" type="color" value="${esc(t.color)}"></label>
+      <label>Màu mái<input data-f="roofColor" type="color" value="${esc(t.roofColor)}"></label>
+      <label class="full">Mặt ngoài (tường + mái)<select data-f="facade">
+        ${[['', 'Kính xám (mặc định)'], ['mint', 'Đá xanh ngọc'], ['orange', 'Đá cam'], ['red', 'Đá đỏ'], ['sand', 'Đá vàng cát'], ['grey', 'Đá xám']]
+          .map(([v, n]) => `<option value="${v}" ${(t.facade || '') === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+      <label>Cao mỗi tầng (m)<input data-f="floorHeight" type="number" step="0.1" min="2" value="${t.floorHeight}"></label>
+      <label>Số căn / tầng<input data-f="unitsPerFloor" type="number" min="0" max="60" value="${t.unitsPerFloor}"></label>
+      <label class="full">Đơn giá tham khảo (triệu đ/m²) — để tính giá ước tính khi rê chuột<input data-f="pricePerM2M" type="number" min="0" step="0.5" placeholder="vd 65" value="${t.pricePerM2 ? +(t.pricePerM2 / 1e6).toFixed(2) : ''}"></label>
+      <label class="full">Tầng cao khác (tầng:mét, cách nhau dấu phẩy)<input data-f="floorHeightOverrides" placeholder="1:4.5, 2:4.2" value="${esc(ov)}"></label>
+      <label class="full">Tầng không bán / thương mại<input data-f="nonSaleFloors" placeholder="1-3" value="${esc(Array.isArray(t.nonSaleFloors) ? t.nonSaleFloors.join(',') : t.nonSaleFloors || '')}"></label>
+      <div class="full row"><span class="muted">Xoay cả tòa:</span>
+        <button data-rot="-15">⟲ 15°</button><button data-rot="-1">⟲ 1°</button><button data-rot="1">⟳ 1°</button><button data-rot="15">⟳ 15°</button></div>
+    </div>
+    <h2 style="margin-top:16px">Ghép tầng</h2>
+    <div class="muted" style="margin:-4px 0 8px">Chọn một mẫu tầng bên trái, rồi <b>bấm hoặc kéo</b> trên cột tầng bên phải để xếp mẫu đó vào các tầng. Mỗi tầng dùng 1 mẫu.</div>
+    ${stackBlock(t)}
+    <h2 style="margin-top:16px">Mẫu tầng <span class="row"><button class="primary" id="btnAddTpl" title="Tải ảnh / PDF layout một tầng → thành một mẫu tầng mới của tòa">＋ Mẫu từ layout</button><button id="btnAddPlan" title="Tự vẽ viền một mẫu tầng mới">＋ Vẽ tay</button></span></h2>
+    <div class="row" style="margin:-2px 0 8px"><span class="muted">Trên mặt bằng:</span>
+      <button id="btnSolo" class="${soloPlan ? 'on' : ''}" title="Chỉ hiện mẫu đang chọn">👁 Chỉ mẫu đang chọn</button>
+      <button id="btnShowAll" class="${soloPlan ? '' : 'on'}" title="Hiện tất cả mẫu (trừ mẫu tắt 👁)">Tất cả mẫu</button></div>
+    <div class="muted" style="margin:-4px 0 8px">Mỗi mẫu là mặt bằng một kiểu tầng (viền + căn). Vẽ từng mẫu riêng, rồi xếp vào tầng ở phần Ghép tầng. Mẫu có hình khác (nhô ra / thụt vào): bấm <b>✥ Canh</b> rồi kéo trên mặt bằng để chồng đúng lên tầng dưới (phím mũi tên để nhích 0,1 m, giữ Shift: 1 m).</div>
+    ${t.plans.map((p, i) => `
+      <div class="plan ${i === sel.plan ? 'sel' : ''}" data-plan="${i}">
+        <div class="head"><i class="tplDot" style="background:${esc(p.tcolor)}"></i><input data-pname value="${esc(p.name)}" title="Tên mẫu tầng"><span class="sp"></span>
+          <button data-act="eye" title="${p.hide2d ? 'Đang ẩn trên mặt bằng — bấm để hiện' : 'Ẩn mẫu này trên mặt bằng (khi xem tất cả mẫu)'}">${p.hide2d ? '🙈' : '👁'}</button>
+          <button data-act="align" class="${alignMode && i === sel.plan ? 'on align' : ''}" title="Kéo trên mặt bằng chỉ dời mẫu này (để chồng đúng lên tầng dưới)">✥ Canh</button>
+          <button data-act="layout" title="Tải ảnh / PDF mặt bằng tầng → tự dựng viền và căn hộ cho lát cắt này">📐 Từ layout</button>
+          <button data-act="split" title="Tách thành 2 lát cắt tại 1 tầng">Tách</button>
+          <button data-act="redraw">Vẽ lại</button>
+          <button data-act="del" class="danger">Xóa</button></div>
+        <div class="row">${Array.isArray(p.only)
+          ? `Tầng <input data-pf="list" value="${esc(compress(p.only))}" placeholder="chưa ghép" style="width:170px" title="Các tầng dùng mẫu này, vd 28, 30, 32-34">`
+          : `Tầng <input type="number" min="1" data-pf="floorFrom" value="${p.floorFrom}"> đến <input type="number" min="1" data-pf="floorTo" value="${p.floorTo}">`}
+          <span class="muted">${p.polygon.length} góc · ${Math.abs(Project3D.util.polyArea(p.polygon)).toFixed(0)} m²</span></div>
+        <div class="row" style="margin-top:6px">Chiều ngang <input data-pw type="number" min="1" step="0.1" value="${(bbox(p.polygon)[2] - bbox(p.polygon)[0]).toFixed(1)}" style="width:72px" title="Sửa để co giãn đều cả mẫu (viền + căn + ảnh layout)"> m
+          <select data-panchor style="width:auto" title="Điểm đứng yên khi co giãn">
+            <option value="l" ${scaleAnchor === 'l' ? 'selected' : ''}>giữ mép trái</option><option value="c" ${scaleAnchor === 'c' ? 'selected' : ''}>giữ giữa</option><option value="r" ${scaleAnchor === 'r' ? 'selected' : ''}>giữ mép phải</option></select>
+          <button data-act="measurePlan" title="Đo 1 đoạn đã biết kích thước trên ảnh layout → co giãn đúng tỉ lệ riêng mẫu này">📏 Đo</button>
+          <button data-act="dims" class="${showDims ? 'on' : ''}" title="Ẩn / hiện thước kích thước trên mặt bằng">${showDims ? 'Ẩn thước' : 'Hiện thước'}</button></div>
+        ${p.layout ? `<div class="row layoutRow"><span class="muted">🖼 Có ảnh layout làm nền</span><span style="flex:1"></span>
+          <button data-act="layoutToggle">${p.layout.hidden ? 'Hiện' : 'Ẩn'}</button>
+          <button data-act="layoutDel" class="danger">Bỏ ảnh</button></div>` : ''}
+        ${unitBlock(t, p, i)}
+      </div>`).join('') || '<div class="empty">Chưa có mẫu tầng.</div>'}
+    ${warnings(t)}
+  `;
+}
+// cột tầng xếp chồng: mỗi ô là 1 tầng, tô màu theo mẫu đang dùng
+let paintTpl = null;   // mẫu đang chọn để tô ('none' = bỏ trống)
+function stackBlock(t) {
+  ensureTemplates(t);
+  if (paintTpl !== 'none' && !t.plans.includes(paintTpl)) paintTpl = t.plans[sel.plan] || t.plans[0] || null;
+  const owner = f => t.plans.find(q => planFloors(q).includes(f));
+  let rows = '';
+  for (let f = t.floors; f >= 1; f--) {
+    const q = owner(f);
+    rows += `<div class="fl ${q ? '' : 'empty'}" data-f="${f}" style="${q ? `background:${esc(q.tcolor)}` : ''}"><b>${f}</b><span>${q ? esc(q.name) : 'trống'}</span></div>`;
+  }
+  return `<div class="stackWrap">
+    <div>${t.plans.map((q, i) => `<button class="tplChip ${q === paintTpl ? 'on' : ''}" data-tpl="${i}"><i style="background:${esc(q.tcolor)}"></i><span>${esc(q.name)}</span><em>${planFloors(q).length} t</em></button>`).join('')}
+      <button class="tplChip ${paintTpl === 'none' ? 'on' : ''}" data-tpl="none"><i style="background:repeating-linear-gradient(45deg,#fff,#fff 3px,#fecaca 3px,#fecaca 6px)"></i><span>Bỏ trống</span></button>
+      <div class="muted" style="margin-top:4px">Mẫu đang chọn: <b>${paintTpl === 'none' ? 'Bỏ trống' : esc(paintTpl?.name || '—')}</b></div></div>
+    <div class="stackCol" id="stackCol">${rows}</div></div>`;
+}
+
+function unitBlock(t, p, i) {
+  const units = p.units || [];
+  const editing = unitEdit && sel.plan === i;
+  const info = units.length ? `<b>${units.length} căn vẽ tay</b>` : t.unitsPerFloor ? `chia tự động ${t.unitsPerFloor} căn` : 'không có căn';
+  let html = `<div class="row" style="margin-top:6px"><span class="muted">Căn hộ: ${info}</span><span style="flex:1"></span>
+    ${editing ? '<button data-act="unitsDone" class="primary">Xong</button>' : '<button data-act="unitsEdit">Sửa căn</button>'}
+    <button data-act="unitsAuto" title="Tạo căn từ cách chia tự động để chỉnh tiếp">Chia tự động</button></div>`;
+  if (editing) {
+    const u = units[sel.unit];
+    html += `<div class="row" style="margin-top:6px;padding:6px;background:#fef2f2;border-radius:6px">
+      <button data-act="unitAdd" class="primary">＋ Vẽ căn</button>
+      ${u ? `<span class="muted">Căn số</span><input data-unitno value="${esc(u.no)}" style="width:56px">
+        <span class="muted">${Math.abs(Project3D.util.polyArea(u.polygon)).toFixed(0)} m²</span>
+        <button data-act="unitDel" class="danger">Xóa căn</button>` : '<span class="muted">Bấm vào một căn trên mặt bằng để sửa</span>'}
+      ${units.length ? '<button data-act="unitsClear" class="danger">Xóa hết căn</button>' : ''}
+    </div>`;
+    if (u) {
+      // thông tin căn — áp cho mọi tầng dùng lát cắt này, hiện khi rê chuột ở trang xem
+      const autoDir = autoDirection(p, u);
+      html += `<div class="grid3" style="margin-top:8px">
+        <label>Loại căn<input data-ufield="type" value="${esc(u.type)}" placeholder="2PN"></label>
+        <label>Phòng ngủ<input data-ufield="bedrooms" type="number" min="0" value="${esc(u.bedrooms)}"></label>
+        <label>WC<input data-ufield="bathrooms" type="number" min="0" value="${esc(u.bathrooms)}"></label>
+        <label>Diện tích (m²)<input data-ufield="area" type="number" min="0" step="0.1" value="${esc(u.area)}" placeholder="≈ ${Math.abs(Project3D.util.polyArea(u.polygon)).toFixed(0)}"></label>
+        <label>Hướng<input data-ufield="direction" value="${esc(u.direction)}" placeholder="${esc(autoDir || 'tự tính')}"></label>
+        <label>View<input data-ufield="view" value="${esc(u.view)}" placeholder="Công viên"></label>
+      </div><div class="muted" style="margin-top:4px">Ô để trống: diện tích & hướng tự tính từ hình vẽ. Giá/trạng thái theo từng căn lấy từ hệ thống bán hàng.</div>`;
+    }
+    const noFacade = units.filter(x => !Project3D.util.facadeSegments(p.polygon, x.polygon).length).map(x => x.no);
+    const dup = units.map(x => x.no).filter((n, k, a) => a.indexOf(n) !== k);
+    if (noFacade.length) html += `<div class="warn">⚠ Căn ${noFacade.map(esc).join(', ')} không chạm viền ngoài → không có mặt tiền để bấm từ bên ngoài (vẫn xem được khi chọn tầng).</div>`;
+    if (dup.length) html += `<div class="warn">⚠ Số căn bị trùng: ${[...new Set(dup)].map(esc).join(', ')}</div>`;
+  }
+  return html;
+}
+
+function autoDirection(p, u) {
+  const segs = Project3D.util.facadeSegments(p.polygon, u.polygon);
+  return Project3D.util.facadeDirection(segs, +project.ground.northDeg || 0);
+}
+
+function warnings(t) {
+  const w = [];
+  const covered = new Set();
+  const dup = new Set();
+  t.plans.forEach(p => { planFloors(p).forEach(f => { if (covered.has(f)) dup.add(f); covered.add(f); }); });
+  if (dup.size) w.push(`Tầng ${compress([...dup].sort((a, b) => a - b))} có 2 lát cắt chồng nhau.`);
+  t.plans.forEach(p => { if (p.floorFrom > p.floorTo) w.push(`Lát cắt có tầng bắt đầu lớn hơn tầng kết thúc.`); if (p.floorTo > t.floors) w.push(`Lát cắt tới tầng ${p.floorTo} nhưng tòa chỉ có ${t.floors} tầng.`); });
+  const missing = [];
+  for (let f = 1; f <= t.floors; f++) if (!covered.has(f)) missing.push(f);
+  if (missing.length) w.push(`Tầng chưa ghép mẫu (sẽ bị trống): ${compress(missing)}`);
+  if (project.towers.filter(x => x.code === t.code).length > 1) w.push(`Mã tòa "${esc(t.code)}" bị trùng.`);
+  return w.length ? `<div class="warn">${w.map(s => `<div>⚠ ${s}</div>`).join('')}</div>` : '';
+}
+// tầng của một lát cắt: danh sách rời (p.only) hoặc cả khoảng floorFrom–floorTo
+function planFloors(p) {
+  if (Array.isArray(p.only)) return p.only.slice();   // [] = mẫu chưa ghép tầng nào
+  const a = []; for (let f = p.floorFrom; f <= p.floorTo; f++) a.push(f); return a;
+}
+function setPlanFloors(p, arr) {
+  arr = [...new Set(arr)].sort((x, y) => x - y);
+  if (!arr.length) { p.only = []; return; }   // giữ lại mẫu, chỉ là chưa dùng cho tầng nào
+  p.floorFrom = arr[0]; p.floorTo = arr[arr.length - 1];
+  if (arr.length === p.floorTo - p.floorFrom + 1) delete p.only; else p.only = arr;
+}
+// tên + màu của mẫu tầng (gán 1 lần rồi lưu lại)
+const TPL_COLORS = ['#a7f3d0', '#bfdbfe', '#fbcfe8', '#fde68a', '#c7d2fe', '#fecaca', '#99f6e4', '#ddd6fe', '#fed7aa', '#d9f99d'];
+function ensureTemplates(t) {
+  const usedN = new Set(t.plans.map(p => p.name).filter(Boolean)), usedC = new Set(t.plans.map(p => p.tcolor).filter(Boolean));
+  t.plans.forEach(p => {
+    if (!p.name) { let k = 0, n; do n = 'Mẫu ' + (k < 26 ? String.fromCharCode(65 + k) : k + 1); while (usedN.has(n) && ++k); p.name = n; usedN.add(n); }
+    if (!p.tcolor) { p.tcolor = TPL_COLORS.find(c => !usedC.has(c)) || TPL_COLORS[usedC.size % TPL_COLORS.length]; usedC.add(p.tcolor); }
+  });
+}
+// gán tầng f cho mẫu target (null = bỏ trống); mỗi tầng chỉ dùng 1 mẫu
+function assignFloor(t, f, target) {
+  t.plans.forEach(q => {
+    const fl = planFloors(q), has = fl.includes(f);
+    if (q === target && !has) setPlanFloors(q, [...fl, f]);
+    else if (q !== target && has) setPlanFloors(q, fl.filter(x => x !== f));
+  });
+}
+// "28, 30, 32-34" → [28, 30, 32, 33, 34]
+function parseFloorList(str, max = 120) {
+  const out = new Set();
+  String(str || '').split(/[,;\s]+/).forEach(tok => {
+    const m = tok.match(/^(\d+)(?:[-–](\d+))?$/); if (!m) return;
+    let a = +m[1], b = +(m[2] || m[1]); if (a > b) [a, b] = [b, a];
+    for (let f = Math.max(1, a); f <= Math.min(b, max); f++) out.add(f);
+  });
+  return [...out].sort((x, y) => x - y);
+}
+function compress(a) {
+  const out = []; let s = a[0], p = a[0];
+  for (let i = 1; i <= a.length; i++) { if (a[i] === p + 1) { p = a[i]; continue; } out.push(s === p ? s : `${s}–${p}`); s = p = a[i]; }
+  return out.join(', ');
+}
+
+$('towerList').onclick = e => {
+  const it = e.target.closest('.towerItem'); if (!it) return;
+  const t = towerById(it.dataset.id);
+  setSel(t.id, t.plans.length ? 0 : -1);
+  renderPanel(); draw(); preview.select(t.code);
+};
+
+$('towerSec').addEventListener('change', e => {
+  const t = selTower(); if (!t) return;
+  const el = e.target;
+  if (el.dataset.f) {
+    const f = el.dataset.f;
+    if (['floors', 'unitsPerFloor'].includes(f)) {
+      const v = Math.max(f === 'floors' ? 1 : 0, Math.round(+el.value || 0));
+      if (f === 'floors') {
+        // kéo dài lát cắt trên cùng theo số tầng mới
+        const top = t.plans.reduce((a, p) => (!a || p.floorTo > a.floorTo ? p : a), null);
+        if (top && top.floorTo === t.floors) top.floorTo = v;
+        t.plans.forEach(p => {
+          if (p.only) { const a = p.only.filter(f => f <= v); if (a.length) setPlanFloors(p, a); else { p.floorFrom = p.floorTo = v; delete p.only; } return; }
+          p.floorTo = Math.min(p.floorTo, v); p.floorFrom = Math.min(p.floorFrom, p.floorTo);
+        });
+      }
+      t[f] = v;
+    } else if (f === 'floorHeight') t[f] = Math.max(2, +el.value || 3.2);
+    else if (f === 'floorHeightOverrides') t[f] = parseOverrides(el.value);
+    else if (f === 'pricePerM2M') { const v = +el.value; if (v > 0) t.pricePerM2 = Math.round(v * 1e6); else delete t.pricePerM2; }
+    else t[f] = el.value.trim();
+  } else if ('panchor' in el.dataset) {
+    scaleAnchor = el.value; draw(); return;
+  } else if ('pw' in el.dataset) {
+    const i = +el.closest('.plan').dataset.plan;
+    scalePlanTo(t, i, parseFloat(String(el.value).replace(',', '.')));
+  } else if ('pname' in el.dataset) {
+    const i = +el.closest('.plan').dataset.plan;
+    if (el.value.trim()) t.plans[i].name = el.value.trim();
+  } else if ('unitno' in el.dataset) {
+    const u = selUnit(); if (u && el.value.trim()) u.no = el.value.trim();
+  } else if (el.dataset.ufield) {
+    const u = selUnit(); if (!u) return;
+    const k = el.dataset.ufield, v = el.value.trim();
+    if (!v) delete u[k];
+    else u[k] = ['bedrooms', 'bathrooms', 'area'].includes(k) ? +v : v;
+  } else if (el.dataset.pf) {
+    const i = +el.closest('.plan').dataset.plan;
+    const q = t.plans[i];
+    if (el.dataset.pf === 'list') {
+      const arr = parseFloorList(el.value);
+      if (arr.length) { setPlanFloors(q, arr); if (q.floorTo > t.floors) t.floors = q.floorTo; }
+      renderPanel(); commit(); return;
+    }
+    q[el.dataset.pf] = Math.max(1, Math.min(120, Math.round(+el.value || 1)));
+    if (q.floorFrom > q.floorTo) { if (el.dataset.pf === 'floorFrom') q.floorTo = q.floorFrom; else q.floorFrom = q.floorTo; }
+    if (q.floorTo > t.floors) t.floors = q.floorTo;   // lát cắt vượt số tầng → tòa tự cao thêm
+  } else return;
+  renderPanel();
+  commit();
+});
+
+// tô tầng bằng chuột (bấm / kéo)
+let painting = null;
+$('towerSec').addEventListener('pointerdown', e => {
+  const cell = e.target.closest('#stackCol .fl'); if (!cell) return;
+  const t = selTower(); if (!t || !paintTpl) return;
+  e.preventDefault();
+  painting = { t, changed: false };
+  paintCell(cell);
+});
+$('towerSec').addEventListener('pointerover', e => { if (painting) { const cell = e.target.closest('#stackCol .fl'); if (cell) paintCell(cell); } });
+window.addEventListener('pointerup', () => {
+  if (!painting) return;
+  const ch = painting.changed; painting = null;
+  if (ch) { const sc = $('stackCol')?.scrollTop; renderPanel(); if ($('stackCol')) $('stackCol').scrollTop = sc; commit(); }
+});
+function paintCell(cell) {
+  const f = +cell.dataset.f, target = paintTpl === 'none' ? null : paintTpl;
+  const cur = painting.t.plans.find(q => planFloors(q).includes(f)) || null;
+  if (cur === target) return;
+  assignFloor(painting.t, f, target);
+  painting.changed = true;
+  cell.classList.toggle('empty', !target);
+  cell.style.background = target ? target.tcolor : '';
+  cell.querySelector('span').textContent = target ? target.name : 'trống';
+}
+
+$('towerSec').addEventListener('click', e => {
+  const t = selTower(); if (!t) return;
+  const b = e.target.closest('button');
+  const planEl = e.target.closest('.plan');
+  const chip = e.target.closest('.tplChip');
+  if (chip) {
+    paintTpl = chip.dataset.tpl === 'none' ? 'none' : t.plans[+chip.dataset.tpl];
+    if (paintTpl !== 'none') { setSel(t.id, +chip.dataset.tpl); draw(); }
+    const sc = $('stackCol')?.scrollTop; renderPanel(); if ($('stackCol')) $('stackCol').scrollTop = sc;
+    return;
+  }
+  if (b?.id === 'btnAddTpl') { openLayout({ type: 'template', towerId: t.id }); return; }
+  if (b?.id === 'btnSolo' || b?.id === 'btnShowAll') { soloPlan = b.id === 'btnSolo'; renderPanel(); draw(); return; }
+  if (b?.id === 'btnDelTower') {
+    if (!confirm(`Xóa tòa ${t.code}?`)) return;
+    project.towers = project.towers.filter(x => x !== t);
+    setSel(project.towers[0]?.id || null, project.towers[0]?.plans.length ? 0 : -1);
+    renderPanel(); commit(); return;
+  }
+  if (b?.id === 'btnAddPlan') { startDraw({ type: 'addPlan', towerId: t.id }); return; }
+  if (b?.dataset.rot) { rotateTower(t, +b.dataset.rot); return; }
+  if (planEl) {
+    const i = +planEl.dataset.plan;
+    if (sel.plan !== i && !b && e.target.tagName !== 'INPUT') { setSel(t.id, i); renderPanel(); draw(); }
+    if (!b) return;
+    if (sel.plan !== i) setSel(t.id, i);
+    const act = b.dataset.act, p = t.plans[i];
+    if (act === 'unitsEdit') { unitEdit = true; sel.unit = -1; activeVertex = -1; setMode('select'); renderPanel(); fitBox(bbox(p.polygon)); return; }
+    if (act === 'unitsDone') { unitEdit = false; sel.unit = -1; activeVertex = -1; renderPanel(); draw(); return; }
+    if (act === 'unitsAuto') { autoUnits(t, i); return; }
+    if (act === 'layout') { openLayout({ type: 'plan', towerId: t.id, plan: i }); return; }
+    if (act === 'eye') {
+      p.hide2d = !p.hide2d; if (!p.hide2d) delete p.hide2d;
+      if (soloPlan && !p.hide2d) soloPlan = false;   // bật mắt khi đang chỉ xem 1 mẫu → chuyển sang xem tất cả
+      renderPanel(); draw(); return;
+    }
+    if (act === 'dims') { showDims = !showDims; $('btnDims').classList.toggle('on', showDims); renderPanel(); draw(); return; }
+    if (act === 'measurePlan') {
+      setMode('measure'); measureTarget = { towerId: t.id, plan: i };
+      if (p.layout?.hidden) p.layout.hidden = false;
+      fitBox(bbox(p.polygon)); draw(); return;
+    }
+    if (act === 'align') {
+      alignMode = !(alignMode && sel.plan === i);
+      if (alignMode) { setMode('select'); fitBox(bbox(t.plans.flatMap(q => q.polygon))); }
+      renderPanel(); draw(); return;
+    }
+    if (act === 'layoutToggle') { p.layout.hidden = !p.layout.hidden; renderPanel(); commit(); return; }
+    if (act === 'layoutDel') { if (confirm('Bỏ ảnh layout của lát cắt này? (viền và căn vẫn giữ)')) { delete p.layout; renderPanel(); commit(); } return; }
+    if (act === 'unitAdd') { startDraw({ type: 'addUnit', towerId: t.id, plan: i }); return; }
+    if (act === 'unitDel') { deleteUnit(sel.unit); return; }
+    if (act === 'unitsClear') { if (confirm('Xóa hết căn vẽ tay? Lát cắt sẽ quay về chia tự động.')) { p.units = []; sel.unit = -1; renderPanel(); commit(); } return; }
+    if (b.dataset.act === 'del') deletePlan(i);
+    if (b.dataset.act === 'redraw') startDraw({ type: 'replace', towerId: t.id, plan: i });
+    if (b.dataset.act === 'split') splitPlan(t, i);
+  }
+});
+
+function deletePlan(i) {
+  const t = selTower();
+  if (!confirm(`Xóa lát cắt ${i + 1} của tòa ${t.code}?`)) return;
+  t.plans.splice(i, 1);
+  setSel(t.id, Math.min(i, t.plans.length - 1));
+  renderPanel(); commit();
+}
+function deleteUnit(k) {
+  const p = selPlan();
+  p.units.splice(k, 1);
+  sel.unit = Math.min(k, p.units.length - 1);
+  activeVertex = -1;
+  renderPanel(); commit();
+}
+// Đổi cách chia tự động thành các căn vẽ tay để sửa tiếp
+function autoUnits(t, i) {
+  const p = t.plans[i];
+  if (p.units?.length && !confirm('Lát cắt này đã có căn. Chia lại tự động sẽ xóa các căn hiện tại?')) return;
+  const n = +prompt('Chia thành bao nhiêu căn?', t.unitsPerFloor || 8);
+  if (!(n > 0)) return;
+  p.units = Project3D.util.unitCells(p.polygon, Math.round(n)).map((poly, k) => ({ no: String(k + 1).padStart(2, '0'), polygon: poly.map(q => q.map(round)) }));
+  sel = { towerId: t.id, plan: i, unit: 0 };
+  unitEdit = true; activeVertex = -1;
+  renderPanel(); commit(); fitBox(bbox(p.polygon));
+}
+// phóng tới một vùng [x0,y0,x1,y1] (mét)
+function fitBox([x0, y0, x1, y1], pad = 80) {
+  const r = cv.getBoundingClientRect();
+  view.scale = Math.min(80, (r.width - pad * 2) / Math.max(1, x1 - x0), (r.height - pad * 2 - 40) / Math.max(1, y1 - y0));
+  view.ox = r.width / 2 - (x0 + x1) / 2 * view.scale;
+  view.oy = (r.height - 40) / 2 - (y0 + y1) / 2 * view.scale;
+  draw();
+}
+function splitPlan(t, i) {
+  const p = t.plans[i], fl = planFloors(p);
+  if (fl.length < 2) return alert('Lát cắt này chỉ có 1 tầng, không tách được.');
+  const v = prompt(`Tách lát cắt tầng ${compress(fl)}.\nPhần trên bắt đầu từ tầng nào? (${fl[1]}–${fl[fl.length - 1]})`, fl[Math.ceil(fl.length / 2)]);
+  const k = Math.round(+v);
+  const lo = fl.filter(f => f < k), hi = fl.filter(f => f >= k);
+  if (!lo.length || !hi.length) return;
+  const upper = JSON.parse(JSON.stringify(p));
+  setPlanFloors(upper, hi);
+  setPlanFloors(p, lo);
+  t.plans.splice(i + 1, 0, upper);
+  sel.plan = i + 1;
+  renderPanel(); commit();
+}
+function rotateTower(t, deg) {
+  const all = t.plans.flatMap(p => p.polygon);
+  if (!all.length) return;
+  const [x0, y0, x1, y1] = bbox(all), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  mapTower(t, ([x, y]) => [round(cx + (x - cx) * c - (y - cy) * s), round(cy + (x - cx) * s + (y - cy) * c)]);
+  commit();
+}
+
+// =====================================================================
+// DỰNG TÒA TỪ LAYOUT (ảnh / PDF mặt bằng tầng)
+// Ảnh → nét tường (theo độ đậm) → bỏ nét mảnh → bịt khe cửa → loang từ mép ảnh vào
+// = phần ngoài tòa → còn lại là viền tòa. Bên trong viền: các khoảng trống lớn được bao
+// bởi tường dày = căn hộ; tường được chia đôi cho 2 căn hai bên nên căn khít viền.
+// =====================================================================
+const layoutCache = new Map();
+function layoutImage(src) {
+  let im = layoutCache.get(src);
+  if (!im) { im = new Image(); im.onload = () => draw(); im.src = src; layoutCache.set(src, im); }
+  return im.complete && im.naturalWidth ? im : null;
+}
+function drawLayoutUnder(L) {
+  const im = layoutImage(L.image); if (!im) return;
+  const [sx, sy] = toS([L.cx, L.cy]);
+  ctx.save();
+  ctx.globalAlpha = .5;
+  ctx.translate(sx, sy); ctx.rotate((L.rot || 0) * Math.PI / 180);
+  ctx.drawImage(im, -L.w * view.scale / 2, -L.h * view.scale / 2, L.w * view.scale, L.h * view.scale);
+  ctx.restore();
+}
+
+// ---- xử lý ảnh nhị phân (mảng 0/1, W×H)
+function mDilate(m, W, H, r) {   // giãn ô vuông (2r+1), cửa sổ trượt nên nhanh với r lớn
+  if (r <= 0) return m;
+  const t = new Uint8Array(W * H), o = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const b = y * W; let c = 0;
+    for (let x = 0; x <= r && x < W; x++) c += m[b + x];
+    for (let x = 0; x < W; x++) { t[b + x] = c > 0 ? 1 : 0; if (x + r + 1 < W) c += m[b + x + r + 1]; if (x - r >= 0) c -= m[b + x - r]; }
+  }
+  for (let x = 0; x < W; x++) {
+    let c = 0;
+    for (let y = 0; y <= r && y < H; y++) c += t[y * W + x];
+    for (let y = 0; y < H; y++) { o[y * W + x] = c > 0 ? 1 : 0; if (y + r + 1 < H) c += t[(y + r + 1) * W + x]; if (y - r >= 0) c -= t[(y - r) * W + x]; }
+  }
+  return o;
+}
+const mNot = m => m.map(v => 1 - v);
+const mErode = (m, W, H, r) => r <= 0 ? m : mNot(mDilate(mNot(m), W, H, r));
+const mOpen = (m, W, H, r) => r <= 0 ? m : mDilate(mErode(m, W, H, r), W, H, r);   // xóa nét mảnh hơn 2r+1 px
+
+function mLabel(mask, W, H) {    // gán nhãn vùng liên thông 4 hướng
+  const N = W * H, lab = new Int32Array(N), q = new Int32Array(N), comps = [];
+  for (let i = 0; i < N; i++) {
+    if (!mask[i] || lab[i]) continue;
+    const id = comps.length + 1; let h = 0, t = 0;
+    q[t++] = i; lab[i] = id;
+    while (h < t) {
+      const j = q[h++], x = j % W;
+      if (x > 0 && mask[j - 1] && !lab[j - 1]) { lab[j - 1] = id; q[t++] = j - 1; }
+      if (x < W - 1 && mask[j + 1] && !lab[j + 1]) { lab[j + 1] = id; q[t++] = j + 1; }
+      if (j >= W && mask[j - W] && !lab[j - W]) { lab[j - W] = id; q[t++] = j - W; }
+      if (j + W < N && mask[j + W] && !lab[j + W]) { lab[j + W] = id; q[t++] = j + W; }
+    }
+    comps.push({ id, area: t, start: i });   // start = điểm đầu tiên theo thứ tự quét (góc trên-trái)
+  }
+  return { lab, comps };
+}
+
+// Dò đường viền ngoài của 1 vùng theo mép pixel (bắt đầu ở cạnh trên của pixel start, đi sang phải)
+function mTrace(inside, W, H, start) {
+  const at = (x, y) => x >= 0 && y >= 0 && x < W && y < H && inside(y * W + x);
+  const D = [[1, 0], [0, 1], [-1, 0], [0, -1]];                 // Đ, N, T, B (y hướng xuống) — rẽ phải = +1
+  const RX = [0, -1, -1, 0], RY = [0, 0, -1, -1];              // pixel bên phải cạnh đi ra từ đỉnh
+  const LX = [0, 0, -1, -1], LY = [-1, 0, 0, -1];              // pixel bên trái
+  const ok = (x, y, d) => at(x + RX[d], y + RY[d]) && !at(x + LX[d], y + LY[d]);
+  const sx = start % W, sy = Math.floor(start / W);
+  let x = sx, y = sy, d = 0, guard = 0;
+  const pts = [[x, y]];
+  do {
+    x += D[d][0]; y += D[d][1];
+    let nd = -1;
+    for (const c of [(d + 1) % 4, d, (d + 3) % 4]) if (ok(x, y, c)) { nd = c; break; }
+    if (nd < 0) break;
+    if (nd !== d) pts.push([x, y]);
+    d = nd;
+  } while (!(x === sx && y === sy && d === 0) && ++guard < 8 * W * H);
+  if (pts.length > 1 && pts[pts.length - 1][0] === sx && pts[pts.length - 1][1] === sy) pts.pop();
+  return pts;
+}
+
+function dpOpen(pts, eps) {      // Douglas–Peucker
+  if (pts.length < 3) return pts.slice();
+  const a = pts[0], b = pts[pts.length - 1], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
+  let md = -1, mi = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p = pts[i];
+    const d = L ? Math.abs(dy * (p[0] - a[0]) - dx * (p[1] - a[1])) / L : Math.hypot(p[0] - a[0], p[1] - a[1]);
+    if (d > md) { md = d; mi = i; }
+  }
+  if (md <= eps) return [a, b];
+  return dpOpen(pts.slice(0, mi + 1), eps).slice(0, -1).concat(dpOpen(pts.slice(mi), eps));
+}
+function simplifyClosed(pts, eps) {
+  if (pts.length <= 4) return pts;
+  let k = 0, md = -1;
+  pts.forEach((p, i) => { const d = Math.hypot(p[0] - pts[0][0], p[1] - pts[0][1]); if (d > md) { md = d; k = i; } });
+  const a = dpOpen(pts.slice(0, k + 1), eps), b = dpOpen(pts.slice(k).concat([pts[0]]), eps);
+  return a.slice(0, -1).concat(b.slice(0, -1));
+}
+function cleanPoly(P, tol) {     // bỏ điểm trùng / thẳng hàng
+  const pts = P.map(p => p.slice());
+  let changed = true;
+  while (changed && pts.length > 3) {
+    changed = false;
+    for (let i = 0; i < pts.length && pts.length > 3; i++) {
+      const n = pts.length, a = pts[(i + n - 1) % n], b = pts[i], c = pts[(i + 1) % n];
+      const L = Math.hypot(c[0] - a[0], c[1] - a[1]);
+      const d = L ? Math.abs((c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0])) / L : 0;
+      if (d <= tol || Math.hypot(b[0] - a[0], b[1] - a[1]) <= tol) { pts.splice(i, 1); changed = true; i--; }
+    }
+  }
+  return pts;
+}
+function orthogonalize(poly, tolDeg = 12) {
+  const n = poly.length, P = poly.map(p => p.slice()), t = Math.tan(tolDeg * Math.PI / 180);
+  for (let i = 0; i < n; i++) {
+    const a = poly[i], b = poly[(i + 1) % n], dx = b[0] - a[0], dy = b[1] - a[1];
+    if (Math.abs(dy) <= Math.abs(dx) * t) { const y = (a[1] + b[1]) / 2; P[i][1] = y; P[(i + 1) % n][1] = y; }
+    else if (Math.abs(dx) <= Math.abs(dy) * t) { const x = (a[0] + b[0]) / 2; P[i][0] = x; P[(i + 1) % n][0] = x; }
+  }
+  return cleanPoly(P, .5);
+}
+const perimeter = poly => poly.reduce((s, p, i) => { const q = poly[(i + 1) % poly.length]; return s + Math.hypot(q[0] - p[0], q[1] - p[1]); }, 0);
+
+function otsu(gray) {
+  const h = new Float64Array(256); for (const v of gray) h[v]++;
+  const N = gray.length; let sum = 0; for (let i = 0; i < 256; i++) sum += i * h[i];
+  let sB = 0, wB = 0, best = 0, th = 128;
+  for (let i = 0; i < 256; i++) {
+    wB += h[i]; if (!wB) continue;
+    const wF = N - wB; if (!wF) break;
+    sB += i * h[i];
+    const v = wB * wF * (sB / wB - (sum - sB) / wF) ** 2;
+    if (v > best) { best = v; th = i; }
+  }
+  return th;
+}
+
+// ---- đọc file ảnh / PDF thành canvas
+let pdfjsReady = null;
+function loadPdfJs() {
+  return pdfjsReady ||= new Promise((ok, no) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; ok(window.pdfjsLib); };
+    s.onerror = () => { pdfjsReady = null; no(new Error('không tải được thư viện đọc PDF (cần mạng)')); };
+    document.head.appendChild(s);
+  });
+}
+async function fileToCanvas(f) {
+  const SRC_MAX = 4000;   // giữ nét để khoanh vùng tòa rồi phóng to vẫn rõ
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+    const pdfjs = await loadPdfJs();
+    const pdf = await pdfjs.getDocument({ data: await f.arrayBuffer() }).promise;
+    const page = await pdf.getPage(1);
+    const v0 = page.getViewport({ scale: 1 });
+    const vp = page.getViewport({ scale: SRC_MAX / Math.max(v0.width, v0.height) });
+    c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: g, viewport: vp }).promise;
+    return c;
+  }
+  const url = URL.createObjectURL(f);
+  try {
+    const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(new Error('không đọc được ảnh')); i.src = url; });
+    const w0 = img.naturalWidth || 1600, h0 = img.naturalHeight || 1200, k = Math.min(1, SRC_MAX / Math.max(w0, h0));
+    c.width = Math.round(w0 * k); c.height = Math.round(h0 * k);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);   // PNG trong suốt → nền trắng
+    g.drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  } finally { URL.revokeObjectURL(url); }
+}
+
+// ---- trạng thái hộp thoại
+const LZ_WORK = 1400;   // cạnh dài ảnh dùng để nhận diện (px)
+const LZ = { target: null, src: null, work: null, W: 0, H: 0, gray: null, roi: null, res: null, units: [], off: new Set(), last: -1, measure: null, drag: null, view: { k: 1, ox: 0, oy: 0 }, msg: '' };
+const LZ_HINT = 'Bấm vùng: bật/tắt căn · Shift + bấm: gộp · ⬚ Khoanh vùng: phóng to quanh tòa · ✏ Sửa viền: kéo / thêm / xóa góc viền · ▭ Vẽ căn: tự vẽ căn · Ctrl+Z: hoàn tác';
+const LZ_OUTLINE_HINT = 'SỬA VIỀN: kéo ô vuông để dời góc (Alt: tắt hít) · kéo nút giữa cạnh để thêm góc / đẩy cạnh / uốn cong (theo kiểu đang chọn) · CHUỘT PHẢI vào góc, nút giữa cạnh hoặc nút cong ◠: menu bo cong / góc vuông / làm thẳng / xóa · bấm lại "✏ Sửa viền" để tắt';
+const LZ_CROP_HINT = 'KHOANH VÙNG: kéo chuột quây quanh tòa (bỏ tiêu đề, chú thích) — máy sẽ phóng to vùng đó · Ctrl+Z hoặc "↺ Cả trang" để quay lại · Esc: hủy';
+const lzP = () => ({
+  thr: +$('lzThr').value, thin: +$('lzThin').value, gap: +$('lzGap').value, simp: +$('lzSimp').value, ortho: $('lzOrtho').checked,
+  uthin: +$('lzUThin').value, ugap: +$('lzUGap').value, minA: +$('lzMinA').value || 0,
+  realW: +String($('lzRealW').value).replace(',', '.') || 0, rot: +$('lzRot').value || 0,
+});
+const lzScale = () => {
+  if (LZ.refUse) return LZ.refUse.mpp * LZ.fs;   // mét / px ảnh làm việc, theo layout đã bỏ trước
+  const R = LZ.res, P = lzP(); return R ? (P.realW > 0 ? P.realW : 40) / Math.max(1, R.bw) : 1;
+};
+// layout đã bỏ trước của tòa (cùng khổ ảnh) → dùng lại cách quy đổi ảnh → mét
+function lzFindRef() {
+  const T = LZ.target; if (!T?.towerId || !LZ.src) return null;
+  const t = towerById(T.towerId);
+  const refs = [t.plans[T.plan], ...t.plans].map(q => q?.layout?.ref).filter(Boolean);
+  return refs.find(r => Math.abs(r.srcW - LZ.src.width) <= 2 && Math.abs(r.srcH - LZ.src.height) <= 2) || null;
+}
+function lzApplyRefUI() {
+  LZ.refUse = LZ.cmp || (LZ.ref && $('lzUseRef').checked ? LZ.ref : null);
+  const T0 = LZ.target, cmpOK = !!T0?.towerId && towerById(T0.towerId).plans.some(q => q.layout?.image);
+  $('lzCompare').hidden = !cmpOK;
+  $('lzRefView').style.display = LZ.refUse && cmpOK ? '' : 'none';
+  $('lzRefTake').style.display = LZ.refUse && cmpOK ? '' : 'none';
+  if (LZ.cmp) $('lzRefNote').style.display = 'none';
+  $('lzRealW').disabled = $('lzRot').disabled = !!LZ.refUse;
+  if (LZ.refUse) $('lzUseOutline').checked = true;   // đã khớp đúng chỗ → lấy luôn hình dáng viền mới
+  lzRender();
+}
+function lzMsg(s) { LZ.msg = s; $('lzMsg').textContent = s || LZ_HINT; }
+
+function openLayout(target) {
+  LZ.target = target;
+  $('fileLayout').click();
+}
+$('btnLayoutTower').onclick = () => openLayout({ type: 'newTower' });
+$('lzPick').onclick = () => $('fileLayout').click();
+$('fileLayout').onchange = async () => {
+  const f = $('fileLayout').files[0]; $('fileLayout').value = '';
+  if (!f) return;
+  try {
+    $('saveState').textContent = 'Đang đọc layout…';
+    const src = await fileToCanvas(f);
+    $('saveState').textContent = '';
+    lzStart(src, f.name);
+  } catch (err) { $('saveState').textContent = ''; alert('Không đọc được file layout: ' + err.message); }
+};
+
+// Ảnh làm việc = vùng LZ.crop của ảnh gốc, thu về cạnh dài ≤ LZ_WORK.
+// Khoanh vùng tòa → cắt lại từ ảnh gốc nên tòa được phóng to, nét tường dày hơn, nhận diện chính xác hơn.
+function lzMakeWork() {
+  const [cx0, cy0, cx1, cy1] = LZ.crop, cw = cx1 - cx0, ch = cy1 - cy0;
+  const k = Math.min(1, LZ_WORK / Math.max(cw, ch));
+  const w = LZ.work = document.createElement('canvas');
+  w.width = Math.max(1, Math.round(cw * k)); w.height = Math.max(1, Math.round(ch * k));
+  const g = w.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, w.width, w.height);
+  g.drawImage(LZ.src, cx0, cy0, cw, ch, 0, 0, w.width, w.height);
+  LZ.W = w.width; LZ.H = w.height; LZ.fs = cw / w.width;   // px ảnh gốc / px làm việc
+  const d = g.getImageData(0, 0, LZ.W, LZ.H).data, gray = LZ.gray = new Uint8Array(LZ.W * LZ.H);
+  for (let i = 0; i < gray.length; i++) gray[i] = (d[i * 4] * 299 + d[i * 4 + 1] * 587 + d[i * 4 + 2] * 114) / 1000;
+  LZ.roi = null; LZ.res = null; LZ.units = []; LZ.measure = null; LZ.last = -1; LZ.manual = false; LZ.activeV = -1; LZ.hist = [];
+}
+function lzStart(src, name) {
+  LZ.src = src;
+  LZ.mu = []; LZ.muSeq = 0; LZ.selMU = null; LZ.unitMode = false; LZ.drawKind = null;
+  LZ.hideOff = false; LZ.hideUnits = false; LZ.activeMV = -1;
+  LZ.editOutline = false; LZ.cropMode = false; LZ.cropHist = []; LZ.arcSeq = 0;
+  LZ.cmp = null; LZ.cmpMode = false; $('lzCmpBox').hidden = true; $('lzCompare').classList.remove('on');
+  lzSetEdgeMode('free', true);
+  $('lzEditOutline').classList.remove('on'); $('lzCrop').classList.remove('on');
+  $('lzDrawUnit').classList.remove('on');
+  lzSyncHideBtns();
+  LZ.crop = [0, 0, src.width, src.height];
+  lzMakeWork();
+  const gray = LZ.gray;
+
+  // mặc định theo cỡ ảnh
+  const M = Math.max(LZ.W, LZ.H);
+  $('lzThr').value = Math.max(60, Math.min(200, otsu(gray)));
+  $('lzThin').value = 1;
+  $('lzGap').value = Math.round(M * .03);
+  $('lzSimp').value = Math.max(2, Math.round(M * .003));
+  $('lzUThin').value = 1;
+  $('lzUGap').value = Math.round(M * .006);
+  const T = LZ.target;
+  if (T.type === 'template') {   // mẫu tầng mới của tòa: chưa ghép tầng, xếp ở phần Ghép tầng
+    const t = towerById(T.towerId), b = bbox(t.plans.flatMap(q => q.polygon));
+    $('lzRealW').value = t.plans.length ? round(b[2] - b[0]) : 50;
+    $('lzTitle').textContent = `Thêm mẫu tầng cho tòa ${t.code}`;
+    $('lzUseOutline').checked = true; $('lzUseOutline').parentElement.style.display = 'none';
+    $('lzRangeBox').style.display = 'none';
+  } else if (T.type === 'plan') {
+    const p = towerById(T.towerId).plans[T.plan], b = bbox(p.polygon);
+    $('lzRealW').value = round(b[2] - b[0]);
+    const t = towerById(T.towerId);
+    $('lzTitle').textContent = `Bỏ layout vào tòa ${t.code}`;
+    $('lzUseOutline').parentElement.style.display = '';
+    // lát cắt đã có căn / layout → mặc định giữ nguyên bề ngoài, chỉ thay bố cục bên trong
+    $('lzUseOutline').checked = !(p.layout || p.units?.length);
+    $('lzRangeBox').style.display = ''; $('lzNewRow').style.display = 'none';
+    $('lzFrom').max = $('lzTo').max = 120;
+    $('lzFrom').value = p.floorFrom; $('lzTo').value = p.floorTo; $('lzList').value = p.only ? compress(p.only) : '';
+    lzRangeHint();
+  } else {
+    $('lzRealW').value = $('lzRealW').value || 50;
+    $('lzTitle').textContent = 'Dựng tòa mới từ layout';
+    $('lzUseOutline').checked = true; $('lzUseOutline').parentElement.style.display = 'none';
+    $('lzRangeBox').style.display = ''; $('lzNewRow').style.display = '';
+    let k = project.towers.length + 1; while (project.towers.some(x => x.code === 'T' + k)) k++;
+    $('lzCode').value = 'T' + k;
+    const n = Math.max(1, Math.round(+$('lzFloors').value) || 20);
+    $('lzFloors').value = n; $('lzFloors').dataset.prev = n; $('lzFrom').value = 1; $('lzTo').value = n; $('lzList').value = '';
+    lzRangeHint();
+  }
+  $('lzRot').value = 0;
+  $('lzFile').textContent = '· ' + name;
+  LZ.ref = lzFindRef();
+  $('lzRefRow').style.display = LZ.ref ? '' : 'none';
+  $('lzUseRef').checked = !!LZ.ref;
+  const oldLayout = !!T.towerId && towerById(T.towerId).plans.some(q => q.layout);
+  const note = $('lzRefNote');
+  if (!LZ.ref && oldLayout) {
+    note.style.display = '';
+    const tw = towerById(T.towerId), withImg = tw.plans.filter(q => q.layout);
+    const ws = withImg.map(q => { const b = bbox(q.polygon); return `${q.name || 'mẫu'} rộng ${(b[2] - b[0]).toFixed(1)} m`; }).join(', ');
+    note.textContent = tw.plans.some(q => q.layout?.ref)
+      ? `Ảnh này khác khổ với layout trước (${ws}) nên máy không tự tính tỉ lệ được. Hãy nhập chiều ngang THẬT của viền đang vẽ.`
+      : `Máy chưa biết tỉ lệ ảnh này (mẫu cũ: ${ws}). Ô "Chiều ngang tòa" phải là chiều ngang THẬT của viền đang vẽ — tầng ngắn hơn thì nhập số nhỏ hơn. Cách chắc nhất: bấm "📏 Đo tỉ lệ trên layout", bấm 2 mép của một căn có ở cả tầng dưới (vd căn 01) rồi nhập đúng chiều ngang căn đó. Từ mẫu này trở đi, ảnh cùng khổ sẽ tự khớp.`;
+  } else note.style.display = 'none';
+  lzApplyRefUI();
+  lzSyncLabels();
+  $('lzModal').hidden = false;
+  lzResize();
+  lzSchedule(30);
+}
+// khoảng tầng sẽ áp layout + các tầng khác bị ảnh hưởng ra sao
+function lzRange() {
+  const t = LZ.target.towerId ? towerById(LZ.target.towerId) : null;
+  const total = t ? t.floors : Math.max(1, Math.min(120, Math.round(+$('lzFloors').value) || 20));
+  let from = Math.round(+$('lzFrom').value) || 1, to = Math.round(+$('lzTo').value) || total;
+  // cho phép vượt số tầng hiện có (vd thêm khối tầng 21–30 nhô ra) → tòa tự tăng số tầng
+  from = Math.max(1, Math.min(120, from)); to = Math.max(from, Math.min(120, to));
+  // "Chỉ các tầng" (tầng rời) — có thì dùng thay cho cả khoảng
+  const list = parseFloorList($('lzList').value);
+  const set = list.length ? list : Array.from({ length: to - from + 1 }, (_, k) => from + k);
+  return { t, from: set[0], to: set[set.length - 1], total, set, listed: list.length > 0 };
+}
+function lzRangeHint() {
+  if (!LZ.target || LZ.target.type === 'template') return;
+  const { t, to, total, set } = lzRange(), C = new Set(set);
+  if (!t) {   // tòa mới
+    const n = Math.max(total, to), rest = [];
+    for (let f = 1; f <= n; f++) if (!C.has(f)) rest.push(f);
+    $('lzRangeHint').textContent = `Tòa mới ${n} tầng. Tầng ${compress(set)} dùng layout này.` +
+      (rest.length ? ` Tầng ${compress(rest)} cùng viền ngoài nhưng chưa có căn — sau đó bấm "📐 Từ layout" trên lát cắt đó để bỏ layout khác.` : '');
+    return;
+  }
+  const keep = [];
+  t.plans.forEach(q => planFloors(q).forEach(f => { if (!C.has(f)) keep.push(f); }));
+  keep.sort((a, b) => a - b);
+  $('lzRangeHint').textContent = `Tầng ${compress(set)} sẽ dùng layout này.` +
+    (keep.length ? ` Tầng ${compress(keep)} giữ bố cục cũ.` : '') +
+    (to > t.floors ? ` Tòa sẽ tăng từ ${t.floors} lên ${to} tầng.` : '') +
+    ' Chọn "Thay viền ngoài" nếu khoảng tầng này có hình dáng ngoài khác (nhô ra / thụt vào); bỏ chọn để giống hệt các tầng khác.';
+}
+['lzFrom', 'lzTo', 'lzList'].forEach(id => $(id).addEventListener('input', lzRangeHint));
+// Chẵn / Lẻ: lấy các tầng chẵn / lẻ trong khoảng từ…đến
+function lzParity(odd) {
+  const a = Math.max(1, Math.round(+$('lzFrom').value) || 1), b = Math.max(a, Math.round(+$('lzTo').value) || a), out = [];
+  for (let f = a; f <= b; f++) if (f % 2 === (odd ? 1 : 0)) out.push(f);
+  $('lzList').value = out.join(', ');
+  lzRangeHint();
+}
+$('lzEven').onclick = () => lzParity(false);
+$('lzOdd').onclick = () => lzParity(true);
+$('lzFloors').addEventListener('input', () => {   // đổi tổng số tầng: kéo "đến tầng" theo nếu đang là tầng trên cùng
+  const n = Math.max(1, Math.round(+$('lzFloors').value) || 1);
+  if (+$('lzTo').value >= (+$('lzFloors').dataset.prev || 0) || +$('lzTo').value > n) $('lzTo').value = n;
+  $('lzFloors').dataset.prev = n;
+  lzRangeHint();
+});
+
+function lzClose() {
+  LZ.cmpMode = false; $('lzCmpBox').hidden = true;
+  $('lzMenu').hidden = true; $('lzModal').hidden = true; LZ.src = LZ.work = LZ.gray = LZ.res = null; LZ.units = []; }
+$('lzClose').onclick = $('lzCancel').onclick = lzClose;
+
+function lzSyncLabels() {
+  const px = v => v + ' px';
+  $('lzThrV').textContent = $('lzThr').value;
+  $('lzThinV').textContent = px($('lzThin').value);
+  $('lzGapV').textContent = px($('lzGap').value);
+  $('lzSimpV').textContent = px($('lzSimp').value);
+  $('lzUThinV').textContent = px($('lzUThin').value);
+  $('lzUGapV').textContent = px($('lzUGap').value);
+}
+let lzTimer = null;
+function lzSchedule(delay = 250) {
+  clearTimeout(lzTimer);
+  lzMsg('Đang nhận diện…');
+  lzTimer = setTimeout(() => {
+    try { lzDetect(); } catch (err) { console.error(err); lzMsg('Lỗi khi nhận diện: ' + err.message); }
+  }, delay);
+}
+['lzThr', 'lzThin', 'lzGap', 'lzSimp', 'lzOrtho', 'lzUThin', 'lzUGap', 'lzMinA'].forEach(id => $(id).addEventListener('input', () => { lzSyncLabels(); lzSchedule(); }));
+['lzRealW', 'lzRot'].forEach(id => $(id).addEventListener('input', () => lzRender()));
+$('lzUseRef').addEventListener('change', lzApplyRefUI);
+
+function lzDetect() {
+  const { W, H, gray } = LZ, N = W * H, P = lzP();
+  const [rx0, ry0, rx1, ry1] = LZ.roi || [0, 0, W, H];
+  // 1. nét tường
+  const wall = new Uint8Array(N);
+  for (let y = ry0; y < ry1; y++) for (let x = rx0; x < rx1; x++) { const j = y * W + x; wall[j] = gray[j] < P.thr ? 1 : 0; }
+  const w1 = mOpen(wall, W, H, P.thin);
+  const wc = mDilate(w1, W, H, P.gap);
+  // 2. loang từ mép ảnh = bên ngoài tòa
+  const out = new Uint8Array(N), q = new Int32Array(N);
+  let t = 0;
+  const push = j => { if (!wc[j] && !out[j]) { out[j] = 1; q[t++] = j; } };
+  for (let x = 0; x < W; x++) { push(x); push((H - 1) * W + x); }
+  for (let y = 0; y < H; y++) { push(y * W); push(y * W + W - 1); }
+  for (let h = 0; h < t; h++) {
+    const j = q[h], x = j % W;
+    if (x > 0) push(j - 1); if (x < W - 1) push(j + 1);
+    if (j >= W) push(j - W); if (j + W < N) push(j + W);
+  }
+  const outD = mDilate(out, W, H, P.gap);   // trả lại phần đã giãn khi bịt khe
+  const F0 = new Uint8Array(N); for (let j = 0; j < N; j++) F0[j] = outD[j] ? 0 : 1;
+  const { lab, comps } = mLabel(F0, W, H);
+  const best = comps.reduce((a, c) => (!a || c.area > a.area ? c : a), null);
+  if (!best || best.area < N * .002) {
+    LZ.res = null; LZ.units = []; lzRender();
+    return lzMsg('Không tìm thấy viền tòa khép kín. Thử tăng "Bịt khe cửa / cửa sổ" hoặc "Độ đậm nét tường", hoặc kéo khung khoanh vùng tòa.');
+  }
+  if (best.area > N * .93) {
+    lzMsg('Viền gần bằng cả ảnh — có thể do khung bản vẽ. Hãy kéo chuột khoanh vùng quanh tòa.');
+  } else lzMsg('');
+  const F = new Uint8Array(N); for (let j = 0; j < N; j++) F[j] = lab[j] === best.id ? 1 : 0;
+  // viền đã chỉnh tay → giữ nguyên, chỉ nhận diện lại phần căn
+  const outline = LZ.manual && LZ.res?.outline ? LZ.res.outline : lzPoly(j => F[j] === 1, best.start, P);
+  const [bx0, by0, bx1, by1] = bbox(outline);
+  const R = { W, H, F, wall: w1, outline, cx: (bx0 + bx1) / 2, cy: (by0 + by1) / 2, bw: bx1 - bx0, bh: by1 - by0 };
+  LZ.res = R;
+  const s = lzScale();
+
+  // 3. căn hộ: vùng trống lớn bên trong viền, ngăn bởi tường dày
+  const wu = P.uthin === P.thin ? w1 : mOpen(wall, W, H, P.uthin);
+  // phép đóng (giãn rồi co): bịt cửa đi nhưng không làm hụt kích thước phòng / hành lang
+  const wuc = mErode(mDilate(wu, W, H, P.ugap), W, H, P.ugap);
+  const free = new Uint8Array(N); for (let j = 0; j < N; j++) free[j] = F[j] && !wuc[j] ? 1 : 0;
+  const L2 = mLabel(free, W, H);
+  const minPx = P.minA / (s * s), remap = new Int32Array(L2.comps.length + 1);
+  let n = 0;
+  L2.comps.forEach(c => { if (c.area >= minPx) remap[c.id] = ++n; });
+  // loang các vùng ra phủ kín viền (tường + vùng nhỏ chia cho vùng gần nhất)
+  const own = new Int32Array(N); t = 0;
+  for (let j = 0; j < N; j++) { const k = remap[L2.lab[j]]; if (k) { own[j] = k; q[t++] = j; } }
+  for (let h = 0; h < t; h++) {
+    const j = q[h], x = j % W, k = own[j];
+    if (x > 0 && F[j - 1] && !own[j - 1]) { own[j - 1] = k; q[t++] = j - 1; }
+    if (x < W - 1 && F[j + 1] && !own[j + 1]) { own[j + 1] = k; q[t++] = j + 1; }
+    if (j >= W && F[j - W] && !own[j - W]) { own[j - W] = k; q[t++] = j - W; }
+    if (j + W < N && F[j + W] && !own[j + W]) { own[j + W] = k; q[t++] = j + W; }
+  }
+  R.own = own;
+  LZ.off = new Set(); LZ.last = -1;
+  lzBuildUnits(true);
+}
+function lzPoly(inside, start, P) {
+  let poly = cleanPoly(simplifyClosed(mTrace(inside, LZ.W, LZ.H, start), P.simp), .5);
+  if (P.ortho && poly.length > 3) poly = orthogonalize(orthogonalize(poly));
+  return poly;
+}
+function lzBuildUnits(autoOff) {
+  const R = LZ.res, P = lzP(), s = lzScale(), starts = new Map();
+  for (let j = 0; j < R.W * R.H; j++) { const k = R.own[j]; if (k && !starts.has(k)) starts.set(k, j); }
+  LZ.units = [...starts].map(([k, st]) => {
+    const poly = lzPoly(j => R.own[j] === k, st, P);
+    const A = Math.abs(polyArea(poly));
+    const per = Math.max(1, perimeter(poly));
+    return { k, poly, A, thick: 2 * A / per, lean: per * per / Math.max(1, A), c: polyCentroid(poly) };
+  }).filter(u => u.poly.length >= 3);
+  // vùng dài hẹp (hành lang) hoặc mỏng hẳn so với các vùng khác → tắt sẵn
+  if (autoOff) {
+    const th = LZ.units.map(u => u.thick).sort((a, b) => a - b), med = th[th.length >> 1] || 0;
+    LZ.units.forEach(u => { if (u.lean > 36 || u.thick < med * .5 || u.thick * s < 1.6) LZ.off.add(u.k); });
+    // nhiều vùng tắt (thường do "Bỏ vùng nhỏ hơn" quá nhỏ) → tự ẩn cho đỡ rối
+    if (LZ.off.size > 20 && !LZ.hideOff) { LZ.hideOff = true; lzSyncHideBtns(); }
+  }
+  lzOrder();
+  lzRender();
+}
+function lzOrder() {   // đánh số căn theo chiều kim đồng hồ, bắt đầu từ phía trái
+  const R = LZ.res; if (!R) return;
+  const key = u => (Math.atan2(u.c[1] - R.cy, u.c[0] - R.cx) + Math.PI * 3) % (Math.PI * 2);
+  const on = LZ.units.filter(u => !LZ.off.has(u.k)).sort((a, b) => key(a) - key(b));
+  const used = new Set((LZ.mu || []).map(u => u.no));
+  LZ.units.forEach(u => u.no = '');
+  let n = 0;
+  on.forEach(u => { do n++; while (used.has(String(n).padStart(2, '0'))); u.no = String(n).padStart(2, '0'); });
+}
+
+// ---- vẽ hộp thoại
+const lzc = $('lzCanvas'), lzg = lzc.getContext('2d');
+function lzResize() {
+  const r = lzc.getBoundingClientRect(), dpr = Math.min(devicePixelRatio, 2);
+  lzc.width = r.width * dpr; lzc.height = r.height * dpr;
+  lzg.setTransform(dpr, 0, 0, dpr, 0, 0);
+  lzRender();
+}
+new ResizeObserver(() => { if (!$('lzModal').hidden) lzResize(); }).observe(lzc);
+
+function lzRender() {
+  $('lzDrawOutline').classList.toggle('on', !!LZ.drawPts && LZ.drawKind === 'outline');
+  const r = lzc.getBoundingClientRect(), g = lzg;
+  g.clearRect(0, 0, r.width, r.height);
+  if (!LZ.work) return;
+  const k = Math.min((r.width - 24) / LZ.W, (r.height - 70) / LZ.H), ox = (r.width - LZ.W * k) / 2, oy = (r.height - 40 - LZ.H * k) / 2 + 10;
+  LZ.view = { k, ox, oy };
+  const S = ([x, y]) => [ox + x * k, oy + y * k];
+  const path = poly => { g.beginPath(); poly.forEach((p, i) => { const [a, b] = S(p); i ? g.lineTo(a, b) : g.moveTo(a, b); }); g.closePath(); };
+  g.fillStyle = '#fff'; g.fillRect(ox, oy, LZ.W * k, LZ.H * k);
+  if (LZ.cmpMode) g.globalAlpha = .9; else
+  g.globalAlpha = LZ.res ? .6 : 1;
+  g.drawImage(LZ.work, ox, oy, LZ.W * k, LZ.H * k);
+  g.globalAlpha = 1;
+  if (LZ.cmpMode) lzDrawCompare(g, S, path);
+
+  const R = LZ.res;
+  if (R) {
+    LZ.units.forEach((u, i) => {
+      const on = !LZ.off.has(u.k);
+      if (LZ.hideUnits || (LZ.hideOff && !on)) return;
+      path(u.poly);
+      g.fillStyle = on ? `hsla(${(i * 67) % 360},75%,55%,.33)` : 'rgba(100,116,139,.16)';
+      g.fill();
+      g.setLineDash(on ? [] : [4, 4]);
+      g.strokeStyle = on ? 'rgba(15,23,42,.75)' : 'rgba(100,116,139,.7)'; g.lineWidth = on ? 1.4 : 1;
+      g.stroke(); g.setLineDash([]);
+      if (u.k === LZ.last) { g.strokeStyle = '#f59e0b'; g.lineWidth = 3; g.stroke(); }
+    });
+    if (LZ.refUse && !LZ.cmpMode) {   // đang tự khớp: hiện viền mẫu cũ để thấy có trùng không
+      const q = lzCmpPlanObj();
+      if (q) { path(q.polygon.map(lzCmpToPx)); g.setLineDash([8, 5]); g.strokeStyle = '#d97706'; g.lineWidth = 2; g.stroke(); g.setLineDash([]); }
+    }
+    path(R.outline); g.strokeStyle = '#2563eb'; g.lineWidth = LZ.editOutline ? 3 : 2; g.stroke();
+    if (lzShowDims && !LZ.drawPts) lzDrawDims(g, S, R.outline);
+    if (LZ.editOutline && !LZ.drawPts) lzDrawHandles(g, R.outline, '#2563eb', LZ.activeV);
+    if (LZ.snapMark) { const [x, y] = S(LZ.snapMark); g.strokeStyle = '#f59e0b'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 9, 0, Math.PI * 2); g.stroke(); }
+    const s = lzScale();
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    LZ.units.forEach(u => {
+      const [x, y] = S(u.c), on = !LZ.off.has(u.k);
+      if (LZ.hideUnits || !on) return;   // vùng tắt: không ghi chữ, chỉ viền mờ
+      const txt = u.no;
+      g.font = `600 ${on ? 13 : 11}px system-ui`;
+      const w = g.measureText(txt).width + 10;
+      g.fillStyle = on ? 'rgba(255,255,255,.92)' : 'rgba(255,255,255,.7)';
+      g.beginPath(); g.roundRect(x - w / 2, y - 10, w, 20, 6); g.fill();
+      g.fillStyle = on ? '#0f172a' : '#64748b'; g.fillText(txt, x, y + 1);
+      if (on) { g.font = '10px system-ui'; g.fillStyle = '#0f172a'; g.fillText((u.A * s * s).toFixed(0) + ' m²', x, y + 19); }
+    });
+  }
+  // căn bạn tự vẽ / đã chuyển sang chỉnh tay (xanh lá)
+  if (LZ.mu?.length && !LZ.hideUnits) {
+    const s = R ? lzScale() : 0;
+    LZ.mu.forEach(u => {
+      const sel = u.id === LZ.selMU;
+      path(u.poly);
+      g.fillStyle = sel ? 'rgba(245,158,11,.32)' : 'rgba(16,185,129,.3)'; g.fill();
+      g.strokeStyle = sel ? '#d97706' : '#047857'; g.lineWidth = sel ? 3 : 2; g.stroke();
+    });
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    LZ.mu.forEach(u => {
+      const [x, y] = S(polyCentroid(u.poly));
+      g.font = '700 13px system-ui';
+      const w = g.measureText(u.no).width + 12;
+      g.fillStyle = '#047857'; g.beginPath(); g.roundRect(x - w / 2, y - 10, w, 20, 6); g.fill();
+      g.fillStyle = '#fff'; g.fillText(u.no, x, y + 1);
+      if (s) { g.font = '10px system-ui'; g.fillStyle = '#064e3b'; g.fillText((Math.abs(polyArea(u.poly)) * s * s).toFixed(1) + ' m²', x, y + 19); }
+    });
+  }
+  // căn đang chọn: ô vuông ở góc + nút ＋ giữa cạnh
+  const su = !LZ.hideUnits && LZ.mu?.find(u => u.id === LZ.selMU);
+  if (su && !LZ.drawPts) lzDrawHandles(g, su.poly, '#047857', LZ.activeMV);
+  if (LZ.snapMark && (LZ.unitMode || LZ.drag?.mu)) { const [x, y] = S(LZ.snapMark); g.strokeStyle = '#f59e0b'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 9, 0, Math.PI * 2); g.stroke(); }
+  if (LZ.drawPts) {   // viền / căn đang vẽ tay
+    const pts = LZ.drawPts.map(S), m = LZ.mouse ? S(LZ.mouse) : null, isU = LZ.drawKind === 'unit';
+    g.strokeStyle = isU ? '#047857' : '#dc2626'; g.lineWidth = 2.5; g.fillStyle = isU ? 'rgba(16,185,129,.15)' : 'rgba(220,38,38,.1)';
+    g.beginPath(); [...pts, ...(m ? [m] : [])].forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y));
+    if (pts.length > 2) g.fill();
+    g.stroke();
+    pts.forEach(([x, y], i) => { g.fillStyle = i ? '#fff' : (isU ? '#047857' : '#dc2626'); g.beginPath(); g.arc(x, y, i ? 4 : 6, 0, Math.PI * 2); g.fill(); g.stroke(); });
+  }
+  if (LZ.roi) {
+    const [x0, y0, x1, y1] = LZ.roi, [a, b] = S([x0, y0]), [c, d] = S([x1, y1]);
+    g.setLineDash([6, 4]); g.strokeStyle = '#dc2626'; g.lineWidth = 2; g.strokeRect(a, b, c - a, d - b); g.setLineDash([]);
+  }
+  if (LZ.drag?.b && !LZ.measure && (LZ.drag.unit || LZ.cropMode)) {
+    const [a, b] = S(LZ.drag.a), [c, d] = S(LZ.drag.b), isU = LZ.drag.unit;
+    g.fillStyle = isU ? 'rgba(16,185,129,.2)' : 'rgba(220,38,38,.08)'; g.fillRect(a, b, c - a, d - b);
+    g.strokeStyle = isU ? '#047857' : '#dc2626'; g.lineWidth = isU ? 2.5 : 1.5; g.strokeRect(a, b, c - a, d - b);
+  }
+  if (LZ.measure?.length) {
+    g.strokeStyle = '#dc2626'; g.fillStyle = '#dc2626'; g.lineWidth = 2;
+    const pts = LZ.measure.map(S);
+    pts.forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 4, 0, Math.PI * 2); g.fill(); });
+    if (pts.length === 2) { g.beginPath(); g.moveTo(...pts[0]); g.lineTo(...pts[1]); g.stroke(); }
+  }
+  lzInfo();
+  lzRenderList();
+  if (LZ.cmpMode) lzCmpInfo();
+}
+function lzRenderList() {
+  const box = $('lzUnitList'), s = LZ.res ? lzScale() : 0, mu = LZ.mu || [];
+  const autoOn = LZ.units.filter(u => !LZ.off.has(u.k)).length;
+  const sig = mu.map(u => `${u.id}:${u.no}:${s ? (Math.abs(polyArea(u.poly)) * s * s).toFixed(1) : ''}`).join('|') + '#' + LZ.selMU + '#' + autoOn;
+  if (sig === LZ.listSig) return;
+  if (box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;   // đang gõ số căn
+  LZ.listSig = sig;
+  const sorted = mu.slice().sort((a, b) => a.no.localeCompare(b.no, undefined, { numeric: true }));
+  box.innerHTML = sorted.map(u => `<div class="lz-urow ${u.id === LZ.selMU ? 'sel' : ''}" data-id="${u.id}">
+      <i></i><input value="${esc(u.no)}" title="Số căn — sửa rồi Enter"><span>${s ? (Math.abs(polyArea(u.poly)) * s * s).toFixed(1) + ' m²' : ''}</span>
+      <button class="danger" data-del title="Xóa căn">✕</button></div>`).join('');
+  $('lzListCount').textContent = mu.length ? `· ${mu.length} căn` : '';
+  $('lzListHint').textContent = (mu.length ? 'Bấm vào một dòng để chọn căn trên hình → kéo góc, nút giữa cạnh, chuột phải để bo cong / vuông góc. ' : 'Chưa có căn tự vẽ. Dùng "▭ Vẽ căn" để vẽ. ')
+    + (autoOn ? `Còn ${autoOn} vùng tự động đang bật — bấm "✎ Chỉnh căn" để đưa vào danh sách và chỉnh.` : '');
+}
+$('lzUnitList').addEventListener('click', e => {
+  const row = e.target.closest('.lz-urow'); if (!row) return;
+  const u = LZ.mu.find(x => x.id === +row.dataset.id); if (!u) return;
+  if (e.target.closest('[data-del]')) { lzDelMU(u); return; }
+  if (LZ.selMU !== u.id) LZ.activeMV = -1;
+  LZ.selMU = u.id;
+  if (LZ.hideUnits) { LZ.hideUnits = false; lzSyncHideBtns(); }
+  lzMsg('Đang sửa căn ' + u.no + ': kéo ô vuông để dời góc · kéo nút giữa cạnh · chuột phải vào góc / cạnh / nút cong ◠: menu bo cong, góc vuông · kéo bên trong để dời căn · Delete: xóa góc đang chọn');
+  lzRender();
+});
+$('lzUnitList').addEventListener('change', e => {
+  const row = e.target.closest('.lz-urow'); if (!row || e.target.tagName !== 'INPUT') return;
+  const u = LZ.mu.find(x => x.id === +row.dataset.id), v = e.target.value.trim();
+  if (!u || !v || v === u.no) return;
+  lzPushUndo(); u.no = v; LZ.listSig = null; lzOrder(); lzRender();
+});
+$('lzUnitList').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.target.blur(); });
+// ---- ⧉ So với mẫu cũ: đè ảnh + viền mẫu cũ (mét) lên ảnh mới qua phép quy đổi đang chỉnh
+function lzCmpToPx([mx, my]) {   // mét → px ảnh làm việc
+  const r = LZ.refUse, a = -r.rot * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a), dx = mx - r.ox, dy = my - r.oy;
+  return [((dx * c - dy * sn) / r.mpp - LZ.crop[0]) / LZ.fs, ((dx * sn + dy * c) / r.mpp - LZ.crop[1]) / LZ.fs];
+}
+function lzCmpPlanObj() {
+  const t = towerById(LZ.target?.towerId); if (!t) return null;
+  const q = $('lzCmpPlan').value !== '' ? t.plans[+$('lzCmpPlan').value] : null;
+  return q?.layout?.image ? q : t.plans.find(x => x.layout?.image) || null;
+}
+// thước của viền đang vẽ trong hộp thoại (mét = px × tỉ lệ đang dùng)
+function lzDrawDims(g, S, poly) {
+  const [x0, y0, x1, y1] = bbox(poly), [a, b] = S([x0, y0]), [c, d] = S([x1, y1]), s = lzScale(), col = '#0f172a', gap = 24;
+  const label = (txt, x, y, rot) => {
+    g.save(); g.translate(x, y); if (rot) g.rotate(-Math.PI / 2);
+    g.font = '600 12px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const w = g.measureText(txt).width + 12;
+    g.fillStyle = '#fff'; g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.roundRect(-w / 2, -10, w, 20, 5); g.fill(); g.stroke();
+    g.fillStyle = col; g.fillText(txt, 0, 1); g.restore();
+  };
+  g.save(); g.strokeStyle = col; g.lineWidth = 1.2; g.setLineDash([]);
+  const yl = b - gap, xl = a - gap;
+  g.beginPath(); g.moveTo(a, b - 4); g.lineTo(a, yl - 6); g.moveTo(c, b - 4); g.lineTo(c, yl - 6); g.moveTo(a, yl); g.lineTo(c, yl);
+  g.moveTo(a - 4, b); g.lineTo(xl - 6, b); g.moveTo(a - 4, d); g.lineTo(xl - 6, d); g.moveTo(xl, b); g.lineTo(xl, d); g.stroke();
+  [[a, yl], [c, yl], [xl, b], [xl, d]].forEach(([x, y]) => { g.beginPath(); g.moveTo(x - 5, y + 5); g.lineTo(x + 5, y - 5); g.stroke(); });
+  label(`Chiều ngang ${((x1 - x0) * s).toFixed(1)} m`, (a + c) / 2, yl);
+  label(`${((y1 - y0) * s).toFixed(1)} m`, xl, (b + d) / 2, true);
+  g.restore();
+}
+function lzDrawCompare(g, S, path) {
+  const q = lzCmpPlanObj(); if (!q || !LZ.refUse) return;
+  const L = q.layout, k = LZ.view.k;
+  if (L?.image) {
+    const im = layoutImage(L.image);
+    if (!im) layoutCache.get(L.image)?.addEventListener('load', () => lzRender(), { once: true });
+    else {
+      const [cx, cy] = S(lzCmpToPx([L.cx, L.cy])), sc = k / (LZ.refUse.mpp * LZ.fs);
+      g.save(); g.globalAlpha = +$('lzCmpAlpha').value / 100;
+      g.translate(cx, cy); g.rotate(((L.rot || 0) - LZ.refUse.rot) * Math.PI / 180);
+      g.drawImage(im, -L.w * sc / 2, -L.h * sc / 2, L.w * sc, L.h * sc);
+      g.restore();
+    }
+  }
+  (q.units || []).forEach(u => { path(u.polygon.map(lzCmpToPx)); g.strokeStyle = 'rgba(217,119,6,.55)'; g.lineWidth = 1; g.stroke(); });
+  path(q.polygon.map(lzCmpToPx)); g.setLineDash([7, 4]); g.strokeStyle = '#d97706'; g.lineWidth = 2.5; g.stroke(); g.setLineDash([]);
+}
+function lzCmpInfo() {
+  const R = LZ.res, q = lzCmpPlanObj();
+  const qb = q ? bbox(q.polygon) : null;
+  $('lzCmpInfo').innerHTML = (q ? `${esc(q.name || 'Mẫu cũ')} rộng <b>${(qb[2] - qb[0]).toFixed(1)} m</b><br>` : '') +
+    (R ? `Viền mới (theo tỉ lệ đang khớp) rộng <b>${(R.bw * lzScale()).toFixed(1)} m</b>` : 'Chưa có viền mới');
+}
+// bật so sánh: lấy phép quy đổi sẵn có (khớp tự động) hoặc đoán: cùng tâm viền, tỉ lệ theo ô chiều ngang
+function lzCmpStart() {
+  const t = towerById(LZ.target.towerId), withImg = t.plans.map((q, i) => [q, i]).filter(([q]) => q.layout?.image);
+  if (!withImg.length) return;
+  const sel0 = withImg.find(([, i]) => i === LZ.target.plan) || withImg[0];
+  $('lzCmpPlan').innerHTML = withImg.map(([q, i]) => `<option value="${i}" ${i === sel0[1] ? 'selected' : ''}>${esc(q.name || 'Mẫu ' + (i + 1))}</option>`).join('');
+  if (!LZ.cmp) {
+    const base = LZ.refUse;
+    if (base) LZ.cmp = { ...base };
+    else {
+      const q = sel0[0], rot = q.layout.rot || 0, mpp = lzScale() / LZ.fs, b = bbox(q.polygon);
+      const R = LZ.res, qc = R ? [R.cx, R.cy] : [LZ.W / 2, LZ.H / 2];
+      const a = rot * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
+      const X = (LZ.crop[0] + qc[0] * LZ.fs) * mpp, Y = (LZ.crop[1] + qc[1] * LZ.fs) * mpp;
+      LZ.cmp = { srcW: LZ.src.width, srcH: LZ.src.height, mpp, rot, ox: (b[0] + b[2]) / 2 - (X * c - Y * sn), oy: (b[1] + b[3]) / 2 - (X * sn + Y * c) };
+    }
+  }
+  if (!LZ.cmpMode) { LZ.cmpHideSave = LZ.hideUnits; LZ.hideUnits = true; lzSyncHideBtns(); }   // ẩn lớp căn cho dễ so nét
+  LZ.cmpMode = true;
+  if (LZ.unitMode) lzSetUnitMode(false);
+  lzSetCrop(false);
+  if (LZ.editOutline) { LZ.editOutline = false; $('lzEditOutline').classList.remove('on'); }
+  $('lzCmpBox').hidden = false; $('lzCompare').classList.add('on');
+  lzMsg('SO SÁNH: kéo chuột để dời ảnh mẫu cũ, lăn chuột để to / nhỏ — chỉnh tới khi các căn giống nhau trùng khít rồi bấm "✓ Xong, đã khớp"');
+  lzApplyRefUI(); lzCmpInfo();
+}
+function lzCmpEnd(keep) {
+  if (LZ.cmpMode) { LZ.hideUnits = !!LZ.cmpHideSave; lzSyncHideBtns(); }
+  LZ.cmpMode = false; $('lzCmpBox').hidden = true; $('lzCompare').classList.remove('on');
+  if (!keep) LZ.cmp = null;
+  lzMsg(keep && LZ.cmp ? 'Đã khớp tỉ lệ & vị trí theo mẫu cũ — vẽ viền / căn rồi bấm Dựng tòa. Tầng mới sẽ chồng đúng chỗ.' : '');
+  lzApplyRefUI();
+}
+// đổi tỉ lệ ảnh mẫu cũ quanh điểm q (px ảnh làm việc): f > 1 = mẫu cũ to ra
+function lzCmpScale(f, q) {
+  const r = LZ.cmp, a = r.rot * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
+  const X = (LZ.crop[0] + q[0] * LZ.fs), Y = (LZ.crop[1] + q[1] * LZ.fs);
+  const mx = r.ox + (X * c - Y * sn) * r.mpp, my = r.oy + (X * sn + Y * c) * r.mpp;   // mét đang nằm dưới q
+  r.mpp /= f;
+  r.ox = mx - (X * c - Y * sn) * r.mpp; r.oy = my - (X * sn + Y * c) * r.mpp;
+  lzRender(); lzCmpInfo();
+}
+function lzCmpMove(dxPx, dyPx) {   // dời ảnh mẫu cũ dx, dy (px ảnh làm việc)
+  const r = LZ.cmp, a = r.rot * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a), ux = dxPx * LZ.fs * r.mpp, uy = dyPx * LZ.fs * r.mpp;
+  r.ox -= ux * c - uy * sn; r.oy -= ux * sn + uy * c;
+  lzRender();
+}
+const lzCmpCenter = () => { const q = lzCmpPlanObj(); if (!q) return [LZ.W / 2, LZ.H / 2]; const b = bbox(q.polygon); return lzCmpToPx([(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]); };
+$('lzCompare').onclick = () => LZ.cmpMode ? lzCmpEnd(true) : lzCmpStart();
+let lzShowDims = true;
+$('lzDims').onclick = () => { lzShowDims = !lzShowDims; $('lzDims').classList.toggle('on', lzShowDims); lzRender(); };
+$('lzRefCmp').onclick = () => lzCmpStart();
+// ⧉ Lấy viền (+ căn) mẫu cũ: chép từ mẫu đã có (mét) sang ảnh mới theo tỉ lệ đang khớp, rồi sửa tiếp
+function lzTakeOld(what) {
+  if (!LZ.refUse) return alert('Cần khớp tỉ lệ với mẫu cũ trước — bấm "⧉ So với mẫu cũ".');
+  const q = lzCmpPlanObj(); if (!q) return;
+  if (what === 'all' && LZ.mu.length && !confirm(`Đang có ${LZ.mu.length} căn tự vẽ. Thêm ${q.units?.length || 0} căn của ${q.name || 'mẫu cũ'} vào?`)) return;
+  lzPushUndo();
+  const pts = q.polygon.map(lzCmpToPx);
+  if (!LZ.res) {
+    const N = LZ.W * LZ.H;
+    LZ.res = { W: LZ.W, H: LZ.H, F: new Uint8Array(N), wall: new Uint8Array(N), own: new Int32Array(N), outline: pts };
+    LZ.units = [];
+  } else LZ.res.outline = pts;
+  lzOutlineChanged();
+  if (what === 'all') {
+    (q.units || []).forEach(u => {
+      const { polygon, no, ...info } = u;
+      LZ.mu.push({ id: ++LZ.muSeq, no: String(no), poly: polygon.map(lzCmpToPx), info });
+    });
+    LZ.units.forEach(a => LZ.off.add(a.k));   // tắt vùng tự động cho khỏi trùng
+    LZ.hideOff = true; lzSyncHideBtns();
+  }
+  if (LZ.cmpMode) lzCmpEnd(true);
+  lzSetEditOutline(true);
+  lzOrder(); lzRender();
+  lzMsg(`Đã chép ${what === 'all' ? `viền + ${q.units?.length || 0} căn` : 'viền'} của ${q.name || 'mẫu cũ'}. Giờ sửa phần khác: kéo / xóa góc viền (chuột phải vào góc → Xóa góc)` + (what === 'all' ? ' · danh sách căn bên phải: xóa / sửa căn khác đi' : '') + '.');
+}
+document.querySelectorAll('[data-take]').forEach(b => b.onclick = () => lzTakeOld(b.dataset.take));
+$('lzCmpDone').onclick = () => lzCmpEnd(true);
+// kéo bảng so sánh bằng thanh tiêu đề; thu gọn chỉ còn tiêu đề
+(() => {
+  const box = $('lzCmpBox'), head = $('lzCmpHead');
+  let dr = null;
+  head.addEventListener('pointerdown', e => {
+    if (e.target.closest('button')) return;
+    const st = box.parentElement.getBoundingClientRect(), r = box.getBoundingClientRect();
+    dr = { dx: e.clientX - r.left, dy: e.clientY - r.top, st };
+    head.setPointerCapture(e.pointerId); head.style.cursor = 'grabbing';
+  });
+  head.addEventListener('pointermove', e => {
+    if (!dr) return;
+    const { st } = dr, w = box.offsetWidth, h = box.offsetHeight;
+    box.style.left = Math.max(0, Math.min(st.width - w, e.clientX - st.left - dr.dx)) + 'px';
+    box.style.top = Math.max(0, Math.min(st.height - h, e.clientY - st.top - dr.dy)) + 'px';
+    box.style.right = 'auto';
+  });
+  head.addEventListener('pointerup', () => { dr = null; head.style.cursor = ''; });
+  $('lzCmpMin').onclick = () => { const m = box.classList.toggle('min'); $('lzCmpMin').textContent = m ? '▸' : '▾'; };
+})();
+$('lzCmpOff').onclick = () => lzCmpEnd(false);
+$('lzCmpAlpha').oninput = () => lzRender();
+$('lzCmpPlan').onchange = () => { lzRender(); lzCmpInfo(); };
+$('lzCmpPlus').onclick = e => lzCmpScale(e.shiftKey ? 1.002 : 1.01, lzCmpCenter());
+$('lzCmpMinus').onclick = e => lzCmpScale(e.shiftKey ? 1 / 1.002 : 1 / 1.01, lzCmpCenter());
+lzc.addEventListener('wheel', e => {
+  if (!LZ.cmpMode) return;
+  e.preventDefault();
+  lzCmpScale(Math.exp(-e.deltaY * (e.shiftKey ? .0002 : .001)), lzPx(e));
+}, { passive: false });
+
+function lzInfo() {
+  const R = LZ.res;
+  if (!R) { $('lzInfo').innerHTML = '<span class="muted">Chưa nhận diện được viền tòa.</span>'; return; }
+  const s = lzScale(), on = LZ.units.filter(u => !LZ.off.has(u.k)), mu = LZ.mu?.length || 0;
+  $('lzInfo').innerHTML = (LZ.cmp && !LZ.cmpMode ? '<span style="color:#b45309">⧉ Đã khớp theo mẫu cũ</span><br>' : '') + `Viền: <b>${R.outline.length} góc</b> · ${(R.bw * s).toFixed(1)} × ${(R.bh * s).toFixed(1)} m · ${(Math.abs(polyArea(R.outline)) * s * s).toFixed(0)} m²<br>
+    Căn hộ: <b>${on.length + mu} căn</b>${mu ? ` (${mu} căn tự vẽ)` : ''}${LZ.units.length > on.length ? ` · ${LZ.units.length - on.length} vùng tự động đang tắt` : ''}`;
+}
+
+// ---- chuột trong hộp thoại
+const lzPx = e => { const r = lzc.getBoundingClientRect(), V = LZ.view; return [(e.clientX - r.left - V.ox) / V.k, (e.clientY - r.top - V.oy) / V.k]; };
+// ---- tay cầm trên đa giác (viền / căn đang chọn)
+// điểm nằm trên đường cong mang mã cung ở p[2] → không hiện ô vuông, cả cung có 1 nút ◠ ở giữa
+function lzArcGroups(poly) {
+  const n = poly.length, seen = new Set(), out = [];
+  poly.forEach(p => {
+    const id = p[2]; if (id == null || seen.has(id)) return; seen.add(id);
+    let start = poly.findIndex((q, j) => q[2] === id && poly[(j - 1 + n) % n][2] !== id);
+    if (start < 0) start = poly.findIndex(q => q[2] === id);
+    let cnt = 0; while (cnt < n && poly[(start + cnt) % n][2] === id) cnt++;
+    out.push({ id, start, cnt, mid: poly[(start + (cnt >> 1)) % n] });
+  });
+  return out;
+}
+function lzHandles(poly) {
+  const V = LZ.view, S = p => [V.ox + p[0] * V.k, V.oy + p[1] * V.k], n = poly.length, out = [];
+  poly.forEach((p, i) => { if (p[2] == null) out.push({ t: 'v', i, s: S(p) }); });
+  lzArcGroups(poly).forEach(a => out.push({ t: 'arc', ...a, s: S(a.mid) }));
+  poly.forEach((a, i) => {
+    const b = poly[(i + 1) % n];
+    if (a[2] != null || b[2] != null) return;
+    const A = S(a), B = S(b);
+    if (Math.hypot(B[0] - A[0], B[1] - A[1]) < 14) return;   // cạnh quá ngắn mới bỏ
+    out.push({ t: 'm', i, s: [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2], q: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], ang: Math.atan2(B[1] - A[1], B[0] - A[0]) });
+  });
+  return out;
+}
+// tay cầm gần chuột nhất (nút giữa cạnh được ưu tiên ngang góc → cạnh ngắn vẫn bấm trúng)
+function lzPickHandle(poly, e) {
+  const r = lzc.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
+  let best = null;
+  for (const h of lzHandles(poly)) {
+    const d = Math.hypot(h.s[0] - sx, h.s[1] - sy);
+    if (d < 9 && (!best || d < best.d)) best = { ...h, d };
+  }
+  return best;
+}
+function lzDrawHandles(g, poly, col, active) {
+  for (const h of lzHandles(poly)) {
+    const [x, y] = h.s;
+    if (h.t === 'v') {
+      g.fillStyle = h.i === active ? col : '#fff'; g.strokeStyle = col; g.lineWidth = 2;
+      g.fillRect(x - 5, y - 5, 10, 10); g.strokeRect(x - 5, y - 5, 10, 10);
+    } else if (h.t === 'm') lzMidGlyph(g, x, y, col, h.ang);
+    else {   // nút cam ở giữa đường cong
+      g.fillStyle = '#f59e0b'; g.strokeStyle = '#fff'; g.lineWidth = 2;
+      g.beginPath(); g.arc(x, y, 7.5, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.beginPath(); g.arc(x, y + 3, 4, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
+    }
+  }
+}
+// nút ◠: kéo = uốn lại · chuột phải / nhấp đúp = làm thẳng
+function lzArcHandle(h, e, which, unit, straighten) {
+  const poly = which === 'outline' ? LZ.res.outline : unit.poly, n = poly.length;
+  const a = poly[(h.start - 1 + n) % n];
+  const base = poly.filter(q => q[2] !== h.id).map(q => q.slice());
+  lzPushUndo();
+  if (straighten) {
+    if (which === 'outline') { LZ.res.outline = base; lzOutlineChanged(); } else unit.poly = base;
+    lzMsg('Đã làm thẳng đoạn cong.'); lzRender(); return;
+  }
+  LZ.drag = { edge: 'curve', which, unit, i: base.indexOf(base.find(q => q[0] === a[0] && q[1] === a[1])), base, start: lzPx(e), moved: false, arcId: ++LZ.arcSeq };
+}
+
+// ---- menu chuột phải trên góc / nút giữa cạnh / nút cong
+const lzMenu = $('lzMenu');
+function lzHideMenu() { lzMenu.hidden = true; }
+const lzPolyGet = (which, unit) => which === 'outline' ? LZ.res.outline : unit.poly;
+function lzPolySet(which, unit, v) { if (which === 'outline') { LZ.res.outline = v; lzOutlineChanged(); } else unit.poly = v; lzRender(); }
+// bo cong một góc: cung tiếp xúc 2 cạnh, dài ~35% cạnh ngắn hơn
+function lzFillet(poly, i) {
+  const n = poly.length, v = poly[i], P = poly[(i - 1 + n) % n], N = poly[(i + 1) % n];
+  const l1 = Math.hypot(P[0] - v[0], P[1] - v[1]), l2 = Math.hypot(N[0] - v[0], N[1] - v[1]);
+  if (l1 < 1e-6 || l2 < 1e-6) return null;
+  const u1 = [(P[0] - v[0]) / l1, (P[1] - v[1]) / l1], u2 = [(N[0] - v[0]) / l2, (N[1] - v[1]) / l2];
+  const th = Math.acos(Math.max(-1, Math.min(1, u1[0] * u2[0] + u1[1] * u2[1])));
+  if (th > Math.PI - .05) return null;   // góc gần thẳng, không cần bo
+  const t = Math.min(l1, l2) * .35;
+  const A = [v[0] + u1[0] * t, v[1] + u1[1] * t], B = [v[0] + u2[0] * t, v[1] + u2[1] * t];
+  let bx = u1[0] + u2[0], by = u1[1] + u2[1]; const bl = Math.hypot(bx, by) || 1; bx /= bl; by /= bl;
+  const k = t / Math.cos(th / 2) - t * Math.tan(th / 2);
+  const arc = lzArcThrough(A, [v[0] + bx * k, v[1] + by * k], B, ++LZ.arcSeq);
+  return [...poly.slice(0, i).map(q => q.slice()), A, ...arc, B, ...poly.slice(i + 1).map(q => q.slice())];
+}
+// góc vuông: lấy x của góc kề này, y của góc kề kia (chọn cách gần vị trí cũ nhất)
+function lzSquareCorner(P, N, near) {
+  const c1 = [P[0], N[1]], c2 = [N[0], P[1]];
+  return Math.hypot(c1[0] - near[0], c1[1] - near[1]) <= Math.hypot(c2[0] - near[0], c2[1] - near[1]) ? c1 : c2;
+}
+function lzMenuAction(kind, h, which, unit) {
+  const poly = lzPolyGet(which, unit), n = poly.length;
+  if (kind === 'delV') { if (which === 'outline') lzDelVertex(h.i); else lzDelMUVertex(unit, h.i); return; }
+  lzPushUndo();
+  let out = null;
+  if (kind === 'fillet') {
+    out = lzFillet(poly, h.i);
+    if (!out) { LZ.hist.pop(); lzMsg('Góc này gần như thẳng, không bo cong được.'); return; }
+  } else if (kind === 'squareV') {
+    out = poly.map(q => q.slice());
+    out[h.i] = lzSquareCorner(poly[(h.i - 1 + n) % n], poly[(h.i + 1) % n], poly[h.i]);
+  } else if (kind === 'curveE') {   // uốn cong cạnh, phình ra ngoài ~25% chiều dài cạnh
+    const a = poly[h.i], b = poly[(h.i + 1) % n], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+    let nx = -dy / L, ny = dx / L;
+    if (pointInPoly([mx + nx * L * .02, my + ny * L * .02], poly)) { nx = -nx; ny = -ny; }
+    const arc = lzArcThrough(a, [mx + nx * L * .25, my + ny * L * .25], b, ++LZ.arcSeq);
+    out = [...poly.slice(0, h.i + 1).map(q => q.slice()), ...arc, ...poly.slice(h.i + 1).map(q => q.slice())];
+  } else if (kind === 'axisE') {   // nắn cạnh thẳng ngang / dọc
+    const a = poly[h.i], j = (h.i + 1) % n, b = poly[j];
+    out = poly.map(q => q.slice());
+    out[j] = Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]) ? [b[0], a[1]] : [a[0], b[1]];
+  } else if (kind === 'addV') {
+    out = poly.map(q => q.slice()); out.splice(h.i + 1, 0, h.q.slice());
+  } else if (kind === 'straight' || kind === 'squareArc') {
+    const ai = (h.start - 1 + n) % n, a = poly[ai], b = poly[(h.start + h.cnt) % n];
+    const corner = kind === 'squareArc' ? lzSquareCorner(a, b, h.mid) : null;
+    out = [];
+    poly.forEach((q, j) => { if (q[2] === h.id) return; out.push(q.slice()); if (j === ai && corner) out.push(corner); });
+    // bỏ điểm thừa nằm thẳng hàng trên cạnh thẳng (không đụng tới đường cong khác)
+    for (let k = 0; k < out.length && out.length > 3; k++) {
+      const m = out.length, A = out[(k - 1 + m) % m], B = out[k], C = out[(k + 1) % m];
+      if (A[2] != null || B[2] != null || C[2] != null) continue;
+      const L = Math.hypot(C[0] - A[0], C[1] - A[1]) || 1;
+      if (Math.abs((C[0] - A[0]) * (B[1] - A[1]) - (C[1] - A[1]) * (B[0] - A[0])) / L < .3) { out.splice(k, 1); k--; }
+    }
+  }
+  if (out) lzPolySet(which, unit, out);
+}
+function lzShowMenu(e, h, which, unit) {
+  const items = h.t === 'v' ? [['Góc', null], ['◠ Bo cong góc này', 'fillet'], ['⟂ Làm góc vuông', 'squareV'], ['✕ Xóa góc', 'delV', 'danger']]
+    : h.t === 'm' ? [['Cạnh', null], ['◠ Uốn cong cạnh này', 'curveE'], ['⟂ Nắn cạnh thẳng ngang / dọc', 'axisE'], ['＋ Thêm góc ở giữa', 'addV']]
+    : [['Đường cong', null], ['⟂ Đổi thành góc vuông', 'squareArc'], ['─ Làm thẳng', 'straight'], ['Kéo nút cam để chỉnh độ cong', null]];
+  lzMenu.innerHTML = '';
+  items.forEach(([label, kind, cls]) => {
+    if (!kind) { const t = document.createElement('b'); t.textContent = label; lzMenu.appendChild(t); return; }
+    const b = document.createElement('button');
+    b.textContent = label; if (cls) b.className = cls;
+    b.onclick = ev => { ev.stopPropagation(); lzHideMenu(); lzMenuAction(kind, h, which, unit); };
+    lzMenu.appendChild(b);
+  });
+  const st = lzc.parentElement.getBoundingClientRect();
+  lzMenu.hidden = false;
+  lzMenu.style.left = Math.max(4, Math.min(e.clientX - st.left + 4, st.width - lzMenu.offsetWidth - 6)) + 'px';
+  lzMenu.style.top = Math.max(4, Math.min(e.clientY - st.top + 4, st.height - lzMenu.offsetHeight - 6)) + 'px';
+}
+lzc.addEventListener('wheel', lzHideMenu, { passive: true });
+
+// ---- chỉnh góc viền bằng tay
+function lzHitVertex(e) {
+  const R = LZ.res; if (!R || LZ.measure || !LZ.editOutline) return -1;
+  const h = lzPickHandle(R.outline, e);
+  return h?.t === 'v' ? h.i : -1;
+}
+function lzHitEdge(e) {
+  const R = LZ.res; if (!R || LZ.measure) return null;
+  const [px, py] = lzPx(e), o = R.outline, tol = 7 / LZ.view.k;
+  let best = null;
+  o.forEach((a, i) => {
+    const b = o[(i + 1) % o.length], dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1;
+    const k = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / L));
+    const q = [a[0] + k * dx, a[1] + k * dy], d = Math.hypot(q[0] - px, q[1] - py);
+    if (d < tol && (!best || d < best.d)) best = { d, i, q };
+  });
+  return best;
+}
+function lzOutlineChanged() {
+  const R = LZ.res, [x0, y0, x1, y1] = bbox(R.outline);
+  Object.assign(R, { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, bw: x1 - x0, bh: y1 - y0 });
+  LZ.manual = true;
+  $('lzAutoOutline').hidden = false;
+}
+function lzPushUndo() {
+  LZ.hist.push(LZ.res ? { outline: LZ.res.outline.map(p => p.slice()), manual: LZ.manual, mu: JSON.parse(JSON.stringify(LZ.mu || [])), off: [...LZ.off] } : null);
+  if (LZ.hist.length > 100) LZ.hist.shift();
+}
+function lzUndo() {
+  if (LZ.drawPts?.length) { LZ.drawPts.pop(); lzRender(); return; }
+  if (!LZ.hist?.length) {   // hết bước chỉnh trong khung này → quay lại khung ảnh trước khi khoanh vùng
+    if (LZ.cropHist?.length) { lzRecrop(LZ.cropHist.pop(), true); lzMsg('Đã quay lại khung ảnh trước khi khoanh vùng'); }
+    return;
+  }
+  const h = LZ.hist.pop();
+  if (!h) { LZ.res = null; LZ.units = []; }
+  else if (LZ.res) {
+    LZ.res.outline = h.outline; lzOutlineChanged(); LZ.manual = h.manual; $('lzAutoOutline').hidden = !h.manual;
+    if (h.mu) LZ.mu = h.mu;
+    if (h.off) LZ.off = new Set(h.off);
+  }
+  LZ.activeV = -1; LZ.drag = null; LZ.selMU = null;
+  lzOrder(); lzRender();
+}
+function lzDelVertex(i) {
+  const o = LZ.res?.outline; if (!o) return;
+  if (o.length <= 3) return alert('Viền phải có ít nhất 3 góc.');
+  lzPushUndo();
+  o.splice(i, 1); LZ.activeV = -1;
+  lzOutlineChanged(); lzRender();
+}
+// hít thẳng hàng với 2 góc kề (giữ cạnh vuông) và hít vào các góc khác
+function lzSnapV(p, i, off) {
+  LZ.snapMark = null;
+  if (off) return p;
+  const o = LZ.res.outline, n = o.length, tol = 7 / LZ.view.k;
+  for (let j = 0; j < n; j++) if (j !== i && Math.hypot(o[j][0] - p[0], o[j][1] - p[1]) < tol) { LZ.snapMark = o[j]; return o[j].slice(); }
+  let [x, y] = p;
+  for (const j of [(i + n - 1) % n, (i + 1) % n]) {
+    if (Math.abs(o[j][0] - x) < tol) x = o[j][0];
+    if (Math.abs(o[j][1] - y) < tol) y = o[j][1];
+  }
+  return [x, y];
+}
+// nút "+" giữa cạnh hoặc nhấn thẳng lên cạnh → chèn góc mới
+function lzHitMid(e) {
+  const R = LZ.res; if (!R || LZ.measure || !LZ.editOutline) return null;
+  const h = lzPickHandle(R.outline, e);
+  if (h) return h.t === 'm' ? { i: h.i, q: h.q } : null;
+  const ed = lzHitEdge(e), o = R.outline;   // nhấn thẳng lên cạnh thẳng (không phải đoạn cong)
+  return ed && o[ed.i][2] == null && o[(ed.i + 1) % o.length][2] == null ? ed : null;
+}
+// ---- kiểu chỉnh cạnh: ⟂ vuông góc (đẩy cả cạnh) · ／ tự do (thêm góc) · ◠ cong (uốn cung)
+const LZ_EDGE_HINT = {
+  ortho: '⟂ VUÔNG GÓC: kéo nút giữa cạnh để đẩy / kéo cả cạnh (giữ góc vuông) · vẽ từng góc tự thẳng ngang / dọc với điểm trước',
+  free: '／ TỰ DO: kéo nút ＋ giữa cạnh để thêm góc',
+  curve: '◠ CONG: kéo nút giữa cạnh (cả cạnh ngắn) để uốn cong · nút cam ◠ giữa đường cong: kéo = chỉnh lại độ cong, chuột phải / nhấp đúp = làm thẳng',
+};
+function lzSetEdgeMode(m, silent) {
+  LZ.edgeMode = m;
+  document.querySelectorAll('#lzEdgeSeg button').forEach(b => b.classList.toggle('on', b.dataset.edge === m));
+  if (!silent) { lzMsg(LZ_EDGE_HINT[m] + (LZ.editOutline || LZ.selMU ? '' : ' — bật "✏ Sửa viền" hoặc chọn một căn để chỉnh')); lzRender(); }
+}
+document.querySelectorAll('#lzEdgeSeg button').forEach(b => b.onclick = () => lzSetEdgeMode(b.dataset.edge));
+// nút tròn giữa cạnh: ＋ (tự do) · ⇕ (vuông góc, vuông với cạnh) · ◠ (cong)
+function lzMidGlyph(g, x, y, col, ang) {
+  g.fillStyle = 'rgba(255,255,255,.95)'; g.strokeStyle = col; g.lineWidth = 1.5;
+  g.beginPath(); g.arc(x, y, 6.5, 0, Math.PI * 2); g.fill(); g.stroke();
+  g.beginPath();
+  if (LZ.edgeMode === 'curve') { g.arc(x, y + 2.5, 3.5, Math.PI * 1.1, Math.PI * 1.9); }
+  else if (LZ.edgeMode === 'ortho') {
+    const nx = -Math.sin(ang) * 3.5, ny = Math.cos(ang) * 3.5;
+    g.moveTo(x - nx, y - ny); g.lineTo(x + nx, y + ny);
+  } else { g.moveTo(x - 3, y); g.lineTo(x + 3, y); g.moveTo(x, y - 3); g.lineTo(x, y + 3); }
+  g.stroke();
+}
+// các điểm trên cung tròn đi qua a → p → b (không gồm a, b)
+function lzArcThrough(a, p, b, id) {
+  const [ax, ay] = a, [bx, by] = b, [px, py] = p;
+  const D = 2 * (ax * (py - by) + px * (by - ay) + bx * (ay - py));
+  if (Math.abs(D) < 1e-6) return [[px, py, id]];
+  const A2 = ax * ax + ay * ay, P2 = px * px + py * py, B2 = bx * bx + by * by;
+  const ux = (A2 * (py - by) + P2 * (by - ay) + B2 * (ay - py)) / D;
+  const uy = (A2 * (bx - px) + P2 * (ax - bx) + B2 * (px - ax)) / D;
+  const r = Math.hypot(ax - ux, ay - uy);
+  const TAU = Math.PI * 2, norm = t => ((t % TAU) + TAU) % TAU;
+  const ta = Math.atan2(ay - uy, ax - ux), tp = Math.atan2(py - uy, px - ux), tb = Math.atan2(by - uy, bx - ux);
+  let sweep = norm(tb - ta);
+  if (norm(tp - ta) > sweep) sweep -= TAU;   // điểm chuột không nằm trên chiều thuận → đi chiều ngược
+  let segs = Math.max(4, Math.min(40, Math.round(Math.abs(sweep) * r * LZ.view.k / 10)));
+  segs += segs % 2;   // số đoạn chẵn → có điểm đúng đỉnh cung (chỗ đặt nút ◠)
+  const out = [];
+  for (let k = 1; k < segs; k++) { const t = ta + sweep * k / segs; out.push([ux + r * Math.cos(t), uy + r * Math.sin(t), id]); }
+  return out;
+}
+// bắt đầu kéo nút giữa cạnh ở kiểu vuông góc / cong (tự do thì chèn góc như cũ)
+function lzStartEdgeDrag(mid, e, which, unit) {
+  if (LZ.edgeMode === 'free') return false;
+  const poly = which === 'outline' ? LZ.res.outline : unit.poly;
+  LZ.drag = { edge: LZ.edgeMode, which, unit, i: mid.i, base: poly.map(q => q.slice()), start: lzPx(e), moved: false, arcId: ++LZ.arcSeq };
+  return true;
+}
+function lzEdgeDragMove(e) {
+  const d = LZ.drag, base = d.base, n = base.length, a = base[d.i], b = base[(d.i + 1) % n], p = lzPx(e);
+  let poly;
+  if (d.edge === 'ortho') {   // đẩy cả cạnh song song
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+    const t = (p[0] - d.start[0]) * nx + (p[1] - d.start[1]) * ny;
+    poly = base.map(q => q.slice());
+    poly[d.i] = [a[0] + nx * t, a[1] + ny * t];
+    poly[(d.i + 1) % n] = [b[0] + nx * t, b[1] + ny * t];
+  } else {                    // uốn cong cân: đỉnh cung nằm trên đường trung trực của cạnh, ngay dưới chuột
+    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+    const nx = -dy / L, ny = dx / L, h = (p[0] - mx) * nx + (p[1] - my) * ny;
+    const apex = e.shiftKey ? p : [mx + nx * h, my + ny * h];   // giữ Shift: cong lệch tự do qua điểm chuột
+    poly = [...base.slice(0, d.i + 1).map(q => q.slice()), ...lzArcThrough(a, apex, b, d.arcId), ...base.slice(d.i + 1).map(q => q.slice())];
+  }
+  d.moved = true;
+  if (d.which === 'outline') { LZ.res.outline = poly; lzOutlineChanged(); } else d.unit.poly = poly;
+  lzRender();
+}
+// vẽ từng góc ở kiểu vuông góc: điểm mới thẳng ngang hoặc thẳng dọc với điểm trước
+function lzOrthoFrom(prev, p) {
+  if (!prev || LZ.edgeMode !== 'ortho') return p;
+  return Math.abs(p[0] - prev[0]) >= Math.abs(p[1] - prev[1]) ? [p[0], prev[1]] : [prev[0], p[1]];
+}
+
+// ---- bật / tắt: sửa viền, khoanh vùng
+function lzSetEditOutline(on) {
+  LZ.editOutline = on; LZ.activeV = -1;
+  $('lzEditOutline').classList.toggle('on', on);
+  if (on) { if (LZ.unitMode) lzSetUnitMode(false); lzSetCrop(false); }
+  lzMsg(on ? LZ_OUTLINE_HINT : '');
+  lzRender();
+}
+function lzSetCrop(on) {
+  LZ.cropMode = on;
+  $('lzCrop').classList.toggle('on', on);
+  if (on) { if (LZ.unitMode) lzSetUnitMode(false); if (LZ.editOutline) { LZ.editOutline = false; $('lzEditOutline').classList.remove('on'); } }
+  lzMsg(on ? LZ_CROP_HINT : '');
+  lzRender();
+}
+$('lzEditOutline').onclick = () => lzSetEditOutline(!LZ.editOutline);
+$('lzCrop').onclick = () => lzSetCrop(!LZ.cropMode);
+
+// ---- tự vẽ căn
+const LZ_UNIT_HINT = 'VẼ CĂN: kéo chuột quây hình chữ nhật · hoặc bấm từng góc (bấm lại điểm đầu / Enter để khép) · bấm vào căn đã vẽ (hoặc dòng trong danh sách bên phải) để sửa · góc tự hít vào viền & căn khác (Alt: tắt) · chuột phải vào căn: xóa · Esc: thoát chế độ vẽ căn';
+function lzSetUnitMode(on) {
+  if (on && !LZ.res) return alert('Cần có viền tòa trước (nhận diện tự động hoặc "✏ Vẽ lại viền").');
+  LZ.unitMode = on; LZ.drawPts = null; LZ.drawKind = null; LZ.activeV = -1; LZ.snapMark = null;
+  $('lzDrawUnit').classList.toggle('on', on);
+  if (on) {   // vẽ căn thì tắt sửa viền / khoanh vùng cho khỏi vướng
+    LZ.editOutline = false; $('lzEditOutline').classList.remove('on');
+    LZ.cropMode = false; $('lzCrop').classList.remove('on');
+  }
+  lzMsg(on ? LZ_UNIT_HINT : '');
+  lzRender();
+}
+$('lzDrawUnit').onclick = () => lzSetUnitMode(!LZ.unitMode);
+$('lzAllOff').onclick = () => {
+  if (!LZ.units.length) return;
+  lzPushUndo();
+  LZ.units.forEach(u => LZ.off.add(u.k));
+  lzOrder(); lzRender();
+};
+// hít vào góc / cạnh của viền và các căn đã vẽ, rồi thẳng hàng với điểm trước
+function lzSnapUnit(p, prev, off, skip) {
+  LZ.snapMark = null;
+  p = p.map((v, k) => Math.max(0, Math.min(k ? LZ.H : LZ.W, v)));
+  if (off || !LZ.res) return p;
+  const tol = 8 / LZ.view.k, polys = [LZ.res.outline, ...LZ.mu.map(u => u.poly)];
+  const isSkip = (o, i) => skip && o === skip.poly && i === skip.i;
+  let best = null, bd = tol;
+  for (const o of polys) o.forEach((v, i) => { if (isSkip(o, i)) return; const d = Math.hypot(v[0] - p[0], v[1] - p[1]); if (d < bd) { bd = d; best = v; } });
+  if (best) { LZ.snapMark = best; return best.slice(); }
+  bd = 6 / LZ.view.k;
+  for (const o of polys) o.forEach((a, i) => {
+    if (skip && o === skip.poly && (i === skip.i || (i + 1) % o.length === skip.i)) return;
+    const b = o[(i + 1) % o.length], dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1;
+    const k = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L));
+    const q = [a[0] + k * dx, a[1] + k * dy], d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (d < bd) { bd = d; best = q; }
+  });
+  if (best) { LZ.snapMark = best; return best; }
+  const refs = skip ? [skip.poly[(skip.i + skip.poly.length - 1) % skip.poly.length], skip.poly[(skip.i + 1) % skip.poly.length]] : prev ? [prev] : [];
+  for (const q of refs) { if (Math.abs(q[0] - p[0]) < tol) p = [q[0], p[1]]; if (Math.abs(q[1] - p[1]) < tol) p = [p[0], q[1]]; }
+  return p;
+}
+// ---- chỉnh căn: góc, thêm góc, dời căn
+function lzHitPolyVertex(poly, e) {
+  const h = lzPickHandle(poly, e);
+  return h?.t === 'v' ? h.i : -1;
+}
+function lzHitPolyMid(poly, e) {
+  const h = lzPickHandle(poly, e);
+  if (h) return h.t === 'm' ? { i: h.i, q: h.q } : null;
+  // nhấn thẳng lên cạnh thẳng
+  const r = lzc.getBoundingClientRect(), V = LZ.view, sx = e.clientX - r.left, sy = e.clientY - r.top, n = poly.length;
+  let best = null;
+  poly.forEach((a, i) => {
+    const b = poly[(i + 1) % n];
+    if (best || a[2] != null || b[2] != null) return;
+    const ax = V.ox + a[0] * V.k, ay = V.oy + a[1] * V.k, bx = V.ox + b[0] * V.k, by = V.oy + b[1] * V.k;
+    const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy || 1, k = Math.max(0, Math.min(1, ((sx - ax) * dx + (sy - ay) * dy) / L));
+    if (Math.hypot(ax + k * dx - sx, ay + k * dy - sy) < 5) best = { i, q: [a[0] + k * (b[0] - a[0]), a[1] + k * (b[1] - a[1])] };
+  });
+  return best;
+}
+function lzDelMUVertex(u, i) {
+  if (u.poly.length <= 3) return alert('Căn phải có ít nhất 3 góc.');
+  lzPushUndo(); u.poly.splice(i, 1); LZ.activeMV = -1; lzRender();
+}
+function lzSyncHideBtns() {
+  $('lzHideOff').classList.toggle('on', !!LZ.hideOff); $('lzHideOff').textContent = LZ.hideOff ? 'Hiện vùng tắt' : 'Ẩn vùng tắt';
+  $('lzHideUnits').classList.toggle('on', !!LZ.hideUnits); $('lzHideUnits').textContent = LZ.hideUnits ? 'Hiện lớp căn' : 'Ẩn lớp căn';
+}
+$('lzHideOff').onclick = () => { LZ.hideOff = !LZ.hideOff; lzSyncHideBtns(); lzRender(); };
+$('lzHideUnits').onclick = () => { LZ.hideUnits = !LZ.hideUnits; if (LZ.hideUnits) LZ.selMU = null; lzSyncHideBtns(); lzRender(); };
+$('lzEditUnits').onclick = () => {
+  const on = LZ.units.filter(u => !LZ.off.has(u.k));
+  if (!on.length) return alert('Không có vùng tự động nào đang bật. Bật vùng bằng cách bấm vào nó, hoặc dùng "▭ Vẽ căn".');
+  lzPushUndo();
+  on.forEach(u => { LZ.mu.push({ id: ++LZ.muSeq, no: u.no, poly: u.poly.map(q => q.slice()) }); LZ.off.add(u.k); });
+  LZ.hideOff = true; LZ.hideUnits = false; lzSyncHideBtns();
+  if (LZ.editOutline) { LZ.editOutline = false; $('lzEditOutline').classList.remove('on'); }
+  lzOrder();
+  lzMsg('CHỈNH CĂN: bấm chọn căn → kéo ô vuông để dời góc · kéo nút ＋ (hoặc kéo trên cạnh) để thêm góc · chuột phải / nhấp đúp vào góc / Delete: xóa góc · kéo bên trong căn để dời cả căn · nhấp đúp trong căn: đổi số');
+  lzRender();
+};
+function lzAddUnit(poly) {
+  poly = cleanPoly(poly, .5);
+  if (poly.length < 3 || Math.abs(polyArea(poly)) < 30) return;
+  lzPushUndo();
+  const used = new Set(LZ.mu.map(u => u.no));
+  let n = 1; while (used.has(String(n).padStart(2, '0'))) n++;
+  const u = { id: ++LZ.muSeq, no: String(n).padStart(2, '0'), poly };
+  LZ.mu.push(u); LZ.selMU = LZ.unitMode ? null : u.id;   // đang vẽ liên tục → không tự chọn (tránh kéo nhầm góc căn vừa vẽ)
+  // vùng tự động nằm trong căn vừa vẽ → tắt để khỏi trùng
+  LZ.units.forEach(a => { if (pointInPoly(a.c, poly)) LZ.off.add(a.k); });
+  lzOrder(); lzRender();
+}
+const lzHitMU = p => (LZ.mu || []).slice().reverse().find(u => pointInPoly(p, u.poly));
+function lzDelMU(u) { lzPushUndo(); LZ.mu = LZ.mu.filter(x => x !== u); LZ.selMU = null; lzOrder(); lzRender(); }
+function lzRenameMU(u) {
+  const v = prompt('Số căn (ví dụ 10):', u.no);
+  if (v == null || !v.trim()) return;
+  lzPushUndo(); u.no = v.trim(); lzOrder(); lzRender();
+}
+// khoanh lại vùng ảnh → giữ căn tự vẽ đúng chỗ
+function lzRecrop(crop, fromUndo) {
+  const fs0 = LZ.fs, c0 = LZ.crop;
+  if (!fromUndo) { LZ.cropHist.push(c0.slice()); if (LZ.cropHist.length > 30) LZ.cropHist.shift(); }
+  const mu = (LZ.mu || []).map(u => ({ ...u, poly: u.poly.map(([x, y]) => [c0[0] + x * fs0, c0[1] + y * fs0]) }));
+  LZ.crop = crop;
+  lzMakeWork();
+  LZ.mu = mu.map(u => ({ ...u, poly: u.poly.map(([x, y]) => [(x - LZ.crop[0]) / LZ.fs, (y - LZ.crop[1]) / LZ.fs]) }));
+  lzRender(); lzSchedule(0);
+}
+
+// vẽ lại cả viền bằng tay
+$('lzDrawOutline').onclick = () => {
+  if (!LZ.work) return;
+  if (LZ.drawPts && LZ.drawKind === 'outline') { LZ.drawPts = null; LZ.drawKind = null; lzMsg(''); lzRender(); return; }   // bấm lại = hủy
+  if (LZ.unitMode) lzSetUnitMode(false);
+  lzSetCrop(false);
+  if (LZ.editOutline) { LZ.editOutline = false; $('lzEditOutline').classList.remove('on'); }
+  LZ.drawPts = []; LZ.drawKind = 'outline'; LZ.activeV = -1; LZ.measure = null;
+  lzMsg('Vẽ viền: bấm từng góc quanh tòa (gồm cả phần trống muốn lấy) · bấm lại điểm đầu hoặc Enter để khép · Backspace xóa điểm cuối · Esc hủy');
+  lzRender();
+};
+function lzFinishDraw() {
+  const pts = LZ.drawPts, kind = LZ.drawKind; LZ.drawPts = null; LZ.drawKind = null;
+  if (kind === 'unit') { lzMsg(LZ_UNIT_HINT); if (pts && pts.length >= 3) lzAddUnit(pts); else lzRender(); return; }
+  lzMsg('');
+  if (!pts || pts.length < 3) { lzRender(); return; }
+  lzPushUndo();
+  if (!LZ.res) {   // máy chưa nhận diện được gì → vẫn cho dùng viền vẽ tay (không có căn)
+    const N = LZ.W * LZ.H;
+    LZ.res = { W: LZ.W, H: LZ.H, F: new Uint8Array(N), wall: new Uint8Array(N), own: new Int32Array(N), outline: pts };
+    LZ.units = [];
+  } else LZ.res.outline = pts;
+  lzOutlineChanged();
+  lzMsg('Đã vẽ xong viền. Muốn chỉnh góc / cạnh thì bấm "✏ Sửa viền".');
+  lzRender();
+}
+$('lzAutoOutline').onclick = () => { lzPushUndo(); LZ.manual = false; LZ.activeV = -1; $('lzAutoOutline').hidden = true; lzSchedule(0); };
+lzc.addEventListener('contextmenu', e => e.preventDefault());
+lzc.addEventListener('dblclick', e => {
+  if (!LZ.res || LZ.measure || LZ.drawPts) return;
+  const su = !LZ.hideUnits && LZ.mu?.find(u => u.id === LZ.selMU);
+  if (su) {
+    const h = lzPickHandle(su.poly, e);
+    if (h?.t === 'arc') { lzArcHandle(h, e, 'unit', su, true); return; }
+    const mv = lzHitPolyVertex(su.poly, e); if (mv >= 0) { lzDelMUVertex(su, mv); return; }
+  }
+  if (LZ.editOutline) {
+    const h = lzPickHandle(LZ.res.outline, e);
+    if (h?.t === 'arc') { lzArcHandle(h, e, 'outline', null, true); return; }
+  }
+  const vi = LZ.unitMode ? -1 : lzHitVertex(e);
+  if (vi >= 0) { lzDelVertex(vi); return; }
+  const u = lzHitMU(lzPx(e));
+  if (u) lzRenameMU(u);
+});
+
+lzc.addEventListener('selectstart', e => e.preventDefault());
+lzc.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  window.getSelection()?.removeAllRanges();
+  lzc.setPointerCapture(e.pointerId);
+  if (!lzMenu.hidden) { lzHideMenu(); if (e.button !== 2) return; }   // bấm ra ngoài = đóng menu
+  if (LZ.cmpMode) { if (e.button === 0) LZ.drag = { cmp: true, sx: e.clientX, sy: e.clientY }; return; }
+  if (LZ.drawPts) {
+    if (e.button !== 0) return;
+    const p = lzPx(e).map((v, k) => Math.max(0, Math.min(k ? LZ.H : LZ.W, v))), d = LZ.drawPts;
+    if (d.length >= 3) {
+      const V = LZ.view;
+      if (Math.hypot((d[0][0] - p[0]) * V.k, (d[0][1] - p[1]) * V.k) < 10) { lzFinishDraw(); return; }
+    }
+    if (LZ.drawKind === 'unit') { d.push(lzOrthoFrom(d[d.length - 1], lzSnapUnit(lzPx(e), d[d.length - 1], e.altKey))); lzRender(); return; }
+    if (LZ.edgeMode === 'ortho' && d.length) { d.push(lzOrthoFrom(d[d.length - 1], p)); lzRender(); return; }
+    // hít thẳng hàng với điểm trước cho cạnh vuông
+    if (d.length && !e.altKey) { const q = d[d.length - 1], tol = 7 / LZ.view.k; if (Math.abs(q[0] - p[0]) < tol) p[0] = q[0]; if (Math.abs(q[1] - p[1]) < tol) p[1] = q[1]; }
+    d.push(p); lzRender();
+    return;
+  }
+  if (e.button === 2 && !LZ.measure) {   // chuột phải trên góc / nút giữa cạnh / nút cong → menu
+    const su2 = !LZ.hideUnits && LZ.mu?.find(u => u.id === LZ.selMU);
+    const h1 = su2 ? lzPickHandle(su2.poly, e) : null;
+    if (h1) { lzShowMenu(e, h1, 'unit', su2); return; }
+    const h2 = LZ.editOutline && LZ.res ? lzPickHandle(LZ.res.outline, e) : null;
+    if (h2) { lzShowMenu(e, h2, 'outline'); return; }
+  }
+  const su = !LZ.hideUnits && !LZ.measure && LZ.mu?.find(u => u.id === LZ.selMU);
+  if (su) {
+    const ah = lzPickHandle(su.poly, e);
+    if (ah?.t === 'arc') { lzArcHandle(ah, e, 'unit', su, e.button === 2); return; }
+    const mv = lzHitPolyVertex(su.poly, e);
+    if (e.button === 2 && mv >= 0) { lzDelMUVertex(su, mv); return; }
+    if (e.button === 0) {
+      if (mv >= 0) { lzPushUndo(); LZ.activeMV = mv; LZ.drag = { mu: su, mv, moved: false }; lzRender(); return; }
+      const md = lzHitPolyMid(su.poly, e);
+      if (md) { lzPushUndo(); if (lzStartEdgeDrag(md, e, 'unit', su)) return; su.poly.splice(md.i + 1, 0, md.q); LZ.activeMV = md.i + 1; LZ.drag = { mu: su, mv: md.i + 1, moved: false, inserted: true }; lzRender(); return; }
+      if (pointInPoly(lzPx(e), su.poly)) { lzPushUndo(); LZ.drag = { mu: su, move: true, start: lzPx(e), orig: su.poly.map(q => q.slice()), moved: false, sx: e.clientX, sy: e.clientY }; return; }
+    }
+  }
+  if (LZ.unitMode) {
+    if (e.button === 2) { const u = lzHitMU(lzPx(e)); if (u) lzDelMU(u); return; }
+    if (e.button !== 0) return;
+    LZ.drag = { a: lzSnapUnit(lzPx(e), null, e.altKey), b: null, sx: e.clientX, sy: e.clientY, unit: true };
+    lzRender();
+    return;
+  }
+  const oh = LZ.editOutline && LZ.res && !LZ.measure ? lzPickHandle(LZ.res.outline, e) : null;
+  if (oh?.t === 'arc') { lzArcHandle(oh, e, 'outline', null, e.button === 2); return; }
+  const vi = lzHitVertex(e);
+  if (e.button === 2) { if (vi >= 0) lzDelVertex(vi); else { const u = lzHitMU(lzPx(e)); if (u) lzDelMU(u); } return; }
+  if (vi >= 0) { lzPushUndo(); LZ.activeV = vi; LZ.drag = { vertex: vi, moved: false }; lzRender(); return; }
+  const mid = e.button === 0 ? lzHitMid(e) : null;
+  if (mid) {
+    lzPushUndo();
+    if (lzStartEdgeDrag(mid, e, 'outline')) return;
+    LZ.res.outline.splice(mid.i + 1, 0, mid.q);
+    LZ.activeV = mid.i + 1; LZ.drag = { vertex: mid.i + 1, moved: false, inserted: true };
+    lzOutlineChanged(); lzRender(); return;
+  }
+  LZ.drag = { a: lzPx(e), b: null, sx: e.clientX, sy: e.clientY };
+});
+lzc.addEventListener('pointermove', e => {
+  LZ.mouse = lzPx(e);
+  if (LZ.cmpMode) {
+    lzc.style.cursor = LZ.drag?.cmp ? 'grabbing' : 'grab';
+    if (LZ.drag?.cmp) { const k = LZ.view.k; lzCmpMove((e.clientX - LZ.drag.sx) / k, (e.clientY - LZ.drag.sy) / k); LZ.drag.sx = e.clientX; LZ.drag.sy = e.clientY; }
+    return;
+  }
+  if (LZ.drawPts) {
+    if (LZ.drawKind === 'unit') LZ.mouse = lzSnapUnit(LZ.mouse, LZ.drawPts[LZ.drawPts.length - 1], e.altKey);
+    LZ.mouse = lzOrthoFrom(LZ.drawPts[LZ.drawPts.length - 1], LZ.mouse);
+    lzc.style.cursor = 'crosshair'; lzRender(); return;
+  }
+  if (LZ.drag?.edge) { lzEdgeDragMove(e); return; }
+  if (LZ.drag?.mu) {
+    const d = LZ.drag, u = d.mu;
+    if (d.mv != null) { u.poly[d.mv] = lzSnapUnit(lzPx(e), null, e.altKey, { poly: u.poly, i: d.mv }); d.moved = true; }
+    else if (d.move && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 4) {
+      const p = lzPx(e), dx = p[0] - d.start[0], dy = p[1] - d.start[1];
+      u.poly = d.orig.map(([x, y]) => [x + dx, y + dy]); d.moved = true;
+    }
+    lzRender(); return;
+  }
+  if (!LZ.drag) {
+    const hs = [];
+    const su0 = !LZ.hideUnits && LZ.mu?.find(u => u.id === LZ.selMU);
+    if (su0) hs.push(lzPickHandle(su0.poly, e));
+    if (LZ.editOutline && LZ.res) hs.push(lzPickHandle(LZ.res.outline, e));
+    if (hs.some(h => h?.t === 'arc')) { lzc.style.cursor = 'grab'; return; }
+  }
+  if (!LZ.drag && !LZ.hideUnits) {
+    const su = LZ.mu?.find(u => u.id === LZ.selMU);
+    if (su && (lzHitPolyVertex(su.poly, e) >= 0)) { lzc.style.cursor = 'move'; return; }
+    if (su && lzHitPolyMid(su.poly, e)) { lzc.style.cursor = LZ.edgeMode === 'free' ? 'copy' : 'grab'; return; }
+  }
+  if (LZ.unitMode && !LZ.drag) { lzc.style.cursor = 'crosshair'; lzSnapUnit(LZ.mouse, null, e.altKey); lzRender(); return; }
+  if (LZ.drag?.unit) {
+    if (Math.hypot(e.clientX - LZ.drag.sx, e.clientY - LZ.drag.sy) > 6) { LZ.drag.b = lzSnapUnit(lzPx(e), null, e.altKey); lzRender(); }
+    return;
+  }
+  if (!LZ.drag) { lzc.style.cursor = lzHitVertex(e) >= 0 ? 'move' : lzHitMid(e) ? (LZ.edgeMode === 'free' ? 'copy' : 'grab') : 'crosshair'; return; }
+  if (LZ.drag.vertex != null) {
+    const p = lzPx(e).map((v, k) => Math.max(0, Math.min(k ? LZ.H : LZ.W, v)));
+    LZ.res.outline[LZ.drag.vertex] = lzSnapV(p, LZ.drag.vertex, e.altKey);
+    LZ.drag.moved = true;
+    lzOutlineChanged(); lzRender();
+    return;
+  }
+  if (LZ.measure) return;
+  if (Math.hypot(e.clientX - LZ.drag.sx, e.clientY - LZ.drag.sy) > 6) { LZ.drag.b = lzPx(e); lzRender(); }
+});
+lzc.addEventListener('pointerup', e => {
+  const d = LZ.drag; LZ.drag = null; if (!d) return;
+  if (d.cmp) { lzRender(); return; }
+  if (d.edge) { if (!d.moved) LZ.hist.pop(); lzRender(); return; }
+  if (d.mu) { if (!d.moved && !d.inserted) LZ.hist.pop(); LZ.snapMark = null; lzRender(); return; }
+  if (d.vertex != null) { if (!d.moved && !d.inserted) LZ.hist.pop(); LZ.snapMark = null; lzRender(); return; }
+  if (d.unit) {
+    if (d.b && Math.abs(d.b[0] - d.a[0]) * LZ.view.k > 8 && Math.abs(d.b[1] - d.a[1]) * LZ.view.k > 8) {
+      const [x0, x1] = [Math.min(d.a[0], d.b[0]), Math.max(d.a[0], d.b[0])], [y0, y1] = [Math.min(d.a[1], d.b[1]), Math.max(d.a[1], d.b[1])];
+      LZ.snapMark = null;
+      lzAddUnit([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]);
+    } else {
+      const hit = lzHitMU(d.a);
+      if (hit) { LZ.selMU = hit.id; LZ.activeMV = -1; LZ.snapMark = null; lzRender(); }   // bấm vào căn đã vẽ → chọn để sửa
+      else { LZ.drawPts = [d.a]; LZ.drawKind = 'unit'; lzRender(); }   // bấm chỗ trống → vẽ căn theo từng góc
+    }
+    return;
+  }
+  LZ.activeV = -1;
+  if (LZ.measure) {
+    LZ.measure.push(d.a); lzRender();
+    if (LZ.measure.length === 2) setTimeout(lzFinishMeasure, 20);
+    return;
+  }
+  if (d.b && !LZ.cropMode) { lzRender(); return; }   // kéo trên nền khi không khoanh vùng → không làm gì
+  if (d.b) {
+    const cl = (v, m) => Math.max(0, Math.min(m, v));
+    const x0 = cl(Math.floor(Math.min(d.a[0], d.b[0])), LZ.W), x1 = cl(Math.ceil(Math.max(d.a[0], d.b[0])), LZ.W);
+    const y0 = cl(Math.floor(Math.min(d.a[1], d.b[1])), LZ.H), y1 = cl(Math.ceil(Math.max(d.a[1], d.b[1])), LZ.H);
+    if (x1 - x0 > 20 && y1 - y0 > 20) {
+      const f = LZ.fs, [ox, oy] = LZ.crop;
+      lzSetCrop(false);
+      lzRecrop([ox + x0 * f, oy + y0 * f, ox + x1 * f, oy + y1 * f].map(Math.round));
+    } else lzRender();
+    return;
+  }
+  lzClick(d.a, e.shiftKey);
+});
+function lzClick([x, y], merge) {
+  const R = LZ.res; if (!R) return;
+  if (LZ.hideUnits) return;
+  const mu = lzHitMU([x, y]);
+  if ((mu ? mu.id : null) !== LZ.selMU) LZ.activeMV = -1;
+  LZ.selMU = mu ? mu.id : null;
+  if (mu) { lzRender(); return; }
+  x = Math.floor(x); y = Math.floor(y);
+  if (x < 0 || y < 0 || x >= R.W || y >= R.H) return;
+  const k = R.own[y * R.W + x]; if (!k) return;
+  if (LZ.hideOff && LZ.off.has(k)) { lzRender(); return; }   // vùng tắt đang ẩn → bỏ qua
+  if (merge && LZ.last > 0 && LZ.last !== k) {
+    for (let j = 0; j < R.own.length; j++) if (R.own[j] === k) R.own[j] = LZ.last;
+    LZ.off.delete(LZ.last); LZ.off.delete(k);
+    lzBuildUnits(false);
+    return;
+  }
+  if (LZ.off.has(k)) LZ.off.delete(k); else LZ.off.add(k);
+  LZ.last = k;
+  lzOrder(); lzRender();
+}
+$('lzRoiClear').onclick = () => {
+  if (!LZ.src || (LZ.crop[0] === 0 && LZ.crop[1] === 0 && LZ.crop[2] === LZ.src.width && LZ.crop[3] === LZ.src.height)) return;
+  lzRecrop([0, 0, LZ.src.width, LZ.src.height]);
+};
+$('lzMeasure').onclick = () => {
+  if (!LZ.res) return alert('Cần nhận diện được viền tòa trước.');
+  LZ.measure = [];
+  lzMsg('Đo tỉ lệ: bấm 2 điểm trên layout mà bạn biết khoảng cách thực (ví dụ hai đầu một đường kích thước)');
+  lzRender();
+};
+function lzFinishMeasure() {
+  const [a, b] = LZ.measure; LZ.measure = null;
+  const dpx = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const v = parseFloat(String(prompt(`Khoảng cách thực giữa 2 điểm vừa bấm là bao nhiêu mét?\n(đang ≈ ${(dpx * lzScale()).toFixed(2)} m theo tỉ lệ hiện tại)`) || '').replace(',', '.'));
+  lzMsg('');
+  if (v > 0 && dpx > 1) $('lzRealW').value = round(v / dpx * LZ.res.bw);
+  lzRender();
+}
+
+// Nét tường trong viền → các hình chữ nhật (để trang xem dựng tường 3D ở mặt cắt tầng).
+// Lưu theo tỉ lệ khung ảnh layout (-0.5…0.5) nên di chuyển / co giãn / xoay tòa vẫn khớp.
+function lzWalls(R, x0, y0, x1, y1, s) {
+  const g = Math.max(1, Math.round(.08 / s));          // lưới ~8 cm cho gọn
+  const gw = Math.ceil((x1 - x0) / g), gh = Math.ceil((y1 - y0) / g), cell = new Uint8Array(gw * gh);
+  for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+    let c = 0;
+    for (let y = y0 + gy * g; y < Math.min(y1, y0 + gy * g + g); y++)
+      for (let x = x0 + gx * g; x < Math.min(x1, x0 + gx * g + g); x++) { const j = y * R.W + x; if (R.wall[j] && R.F[j]) c++; }
+    cell[gy * gw + gx] = c * 2 >= g * g ? 1 : 0;
+  }
+  // bỏ đốm nhỏ (chữ, ký hiệu còn sót)
+  const { lab, comps } = mLabel(cell, gw, gh), bb = comps.map(() => [1e9, 1e9, -1, -1]);
+  for (let j = 0; j < lab.length; j++) if (lab[j]) { const b = bb[lab[j] - 1], x = j % gw, y = (j / gw) | 0; if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x > b[2]) b[2] = x; if (y > b[3]) b[3] = y; }
+  const keep = bb.map(b => Math.max(b[2] - b[0] + 1, b[3] - b[1] + 1) * g * s >= .8);
+  const on = j => cell[j] && keep[lab[j] - 1];
+  // gộp các đoạn cùng hàng → hình chữ nhật
+  const rects = []; let open = new Map();
+  for (let gy = 0; gy < gh; gy++) {
+    const next = new Map();
+    for (let gx = 0; gx < gw;) {
+      if (!on(gy * gw + gx)) { gx++; continue; }
+      let e = gx; while (e < gw && on(gy * gw + e)) e++;
+      const key = gx * 100000 + e;
+      let r = open.get(key);
+      if (r) r[3] = gy + 1; else { r = [gx, gy, e, gy + 1]; rects.push(r); }
+      next.set(key, r);
+      gx = e;
+    }
+    open = next;
+  }
+  const W = x1 - x0, H = y1 - y0;
+  const nx = v => +((Math.min(v * g, W) - W / 2) / W).toFixed(4), ny = v => +((Math.min(v * g, H) - H / 2) / H).toFixed(4);
+  return rects.flatMap(([a, b, c, d]) => [nx(a), ny(b), nx(c), ny(d)]);
+}
+
+// ---- áp dụng vào dự án
+function snapToOutline(poly, outline, tol) {
+  return poly.map(p => {
+    let best = null, bd = tol;
+    for (const v of outline) { const d = Math.hypot(v[0] - p[0], v[1] - p[1]); if (d < bd) { bd = d; best = v.slice(); } }
+    if (best) return best;
+    bd = tol;
+    outline.forEach((a, i) => {
+      const b = outline[(i + 1) % outline.length], dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1;
+      const k = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L));
+      const q = [a[0] + k * dx, a[1] + k * dy], d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      if (d < bd) { bd = d; best = q.map(round); }
+    });
+    return best || p;
+  });
+}
+$('lzApply').onclick = () => {
+  const R = LZ.res, P = lzP(), T = LZ.target;
+  if (!R) return alert('Chưa nhận diện được viền tòa — chỉnh các thanh bên phải hoặc khoanh vùng tòa.');
+  const ref = LZ.refUse;
+  if (!ref && !(P.realW > 0)) return alert('Nhập chiều ngang thực tế của tòa (m).');
+  const s = lzScale(), rotDeg = ref ? ref.rot : P.rot, a = rotDeg * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+  let Mf;
+  if (ref) {   // px ảnh gốc → mét, đúng như layout đã bỏ trước
+    Mf = ([x, y]) => {
+      const dx = (LZ.crop[0] + x * LZ.fs) * ref.mpp, dy = (LZ.crop[1] + y * LZ.fs) * ref.mpp;
+      return [ref.ox + dx * ca - dy * sa, ref.oy + dx * sa + dy * ca];
+    };
+  } else {
+    let center;
+    if (T.type === 'plan') { const b = bbox(towerById(T.towerId).plans[T.plan].polygon); center = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]; }
+    else if (T.type === 'template' && towerById(T.towerId).plans.length) { const b = bbox(towerById(T.towerId).plans.flatMap(q => q.polygon)); center = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]; }
+    else { const r = cv.getBoundingClientRect(); center = toW(r.width / 2, (r.height - 40) / 2).map(round); }
+    Mf = ([x, y]) => { const dx = (x - R.cx) * s, dy = (y - R.cy) * s; return [center[0] + dx * ca - dy * sa, center[1] + dx * sa + dy * ca]; };
+  }
+  const M = p => Mf(p).map(round);
+
+  const outline = cleanPoly(R.outline.map(M), .05);
+  const useOutline = T.type !== 'plan' || $('lzUseOutline').checked;   // mẫu mới / tòa mới: luôn lấy viền mới
+  // giữ bề ngoài → căn hít vào viền cũ của lát cắt
+  const shell = useOutline ? outline : towerById(T.towerId).plans[T.plan].polygon.map(q => q.slice());
+  // căn: hít vào viền ngoài rồi gom các góc gần nhau giữa các căn cho khít
+  const tol = Math.max(.8, P.simp * s * 1.5);
+  const canon = shell.map(p => p.slice());
+  const units = [...LZ.units.filter(u => !LZ.off.has(u.k)), ...(LZ.mu || [])]
+    .sort((x, y) => x.no.localeCompare(y.no, undefined, { numeric: true })).map(u => {
+    let poly = snapToOutline(u.poly.map(M), shell, tol).map(p => {
+      const q = canon.find(v => Math.hypot(v[0] - p[0], v[1] - p[1]) < .6);
+      if (q) return q.slice();
+      canon.push(p); return p;
+    });
+    poly = cleanPoly(poly, .05);
+    const area = Math.abs(polyArea(poly));
+    return poly.length >= 3 && area > 1 ? { ...(u.info || {}), no: u.no, polygon: poly } : null;
+  }).filter(Boolean);
+
+  let layout = null;
+  if ($('lzKeepImg').checked) {
+    // cắt ảnh quanh tòa (+ lề) rồi thu nhỏ cho JSON gọn
+    const mg = Math.max(R.bw, R.bh) * .06;
+    const x0 = Math.max(0, R.cx - R.bw / 2 - mg), x1 = Math.min(R.W, R.cx + R.bw / 2 + mg);
+    const y0 = Math.max(0, R.cy - R.bh / 2 - mg), y1 = Math.min(R.H, R.cy + R.bh / 2 + mg);
+    const f = LZ.fs, k = Math.min(1, 1600 / (Math.max(x1 - x0, y1 - y0) * f)), [ox, oy] = LZ.crop;
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round((x1 - x0) * f * k)); c.height = Math.max(1, Math.round((y1 - y0) * f * k));
+    c.getContext('2d').drawImage(LZ.src, ox + x0 * f, oy + y0 * f, (x1 - x0) * f, (y1 - y0) * f, 0, 0, c.width, c.height);
+    const cc = Mf([(x0 + x1) / 2, (y0 + y1) / 2]);
+    const o = Mf([-LZ.crop[0] / LZ.fs, -LZ.crop[1] / LZ.fs]);   // điểm (0,0) của ảnh gốc ở đâu (mét)
+    layout = { image: c.toDataURL('image/jpeg', .8), cx: cc[0], cy: cc[1], w: (x1 - x0) * s, h: (y1 - y0) * s, rot: rotDeg,
+      ref: { srcW: LZ.src.width, srcH: LZ.src.height, mpp: s / LZ.fs, ox: o[0], oy: o[1], rot: rotDeg },
+      walls: lzWalls(R, Math.floor(x0), Math.floor(y0), Math.ceil(x1), Math.ceil(y1), s) };
+  }
+
+  let t, pi;
+  if (T.type === 'template') {
+    t = towerById(T.towerId);
+    const np = { polygon: outline, only: [], floorFrom: 1, floorTo: 1 };
+    if ($('lzUseUnits').checked && units.length) np.units = units;
+    if (layout) np.layout = layout;
+    t.plans.push(np); ensureTemplates(t);
+    pi = t.plans.length - 1;
+    paintTpl = np;   // chọn sẵn để tô tầng
+  } else if (T.type === 'plan') {
+    const { to, set } = lzRange(), C = new Set(set);
+    t = towerById(T.towerId);
+    const base = t.plans[T.plan];
+    if (to > t.floors) t.floors = to;
+    const np = { polygon: shell };
+    setPlanFloors(np, set);
+    if ($('lzUseUnits').checked && units.length) np.units = units;
+    else if (base.units?.length && !useOutline) np.units = JSON.parse(JSON.stringify(base.units));
+    if (layout) np.layout = layout;
+    // bớt các tầng được chọn khỏi lát cắt cũ (tầng còn lại giữ nguyên), rồi thêm lát cắt mới cho các tầng đó
+    const hit = t.plans.filter(q => planFloors(q).some(f => C.has(f)));
+    if (hit.some(q => q.units?.length || q.layout) &&
+      !confirm(`Tầng ${compress(set)} đang có bố cục căn. Thay bằng layout mới?\n(Các tầng khác giữ nguyên.)`)) return;
+    const plans = [];
+    t.plans.forEach(q => {
+      if (!hit.includes(q)) { plans.push(q); return; }
+      setPlanFloors(q, planFloors(q).filter(f => !C.has(f)));   // hết tầng → giữ lại làm mẫu chưa ghép
+      plans.push(q);
+    });
+    plans.push(np);
+    plans.sort((x, y) => x.floorFrom - y.floorFrom);
+    t.plans = plans;
+    pi = plans.indexOf(np);
+  } else {
+    const n = project.towers.length, [color, roofColor] = PALETTE[n % PALETTE.length];
+    let k = n + 1; while (project.towers.some(x => x.code === 'T' + k)) k++;
+    const code = $('lzCode').value.trim() || 'T' + k;
+    if (project.towers.some(x => x.code === code) && !confirm(`Đã có tòa mã "${code}". Vẫn tạo thêm?`)) return;
+    const { to, total, set } = lzRange(), floors = Math.max(total, to), C = new Set(set);
+    const plan = { polygon: outline };
+    setPlanFloors(plan, set);
+    if ($('lzUseUnits').checked && units.length) plan.units = units;
+    if (layout) plan.layout = layout;
+    // các tầng còn lại: cùng viền ngoài, chưa có căn (bỏ layout khác vào sau)
+    const plans = [plan], rest = [];
+    for (let f = 1; f <= floors; f++) if (!C.has(f)) rest.push(f);
+    if (rest.length) { const q = { polygon: outline.map(v => v.slice()) }; setPlanFloors(q, rest); plans.push(q); }
+    plans.sort((x, y) => x.floorFrom - y.floorFrom);
+    t = { id: uid(), code, color, roofColor, floors, floorHeight: 3.2, floorHeightOverrides: {}, unitsPerFloor: units.length || 8, nonSaleFloors: '', plans };
+    project.towers.push(t); pi = plans.indexOf(plan);
+  }
+  lzClose();
+  setSel(t.id, pi);
+  if (t.plans[pi].units?.length) { unitEdit = true; sel.unit = -1; }
+  setMode('select');
+  renderPanel(); commit();
+  fitBox(bbox(t.plans[pi].polygon));
+  preview.select(t.code);
+};
+
+// ---- dự án
+$('pName').onchange = e => { project.project = e.target.value; commit(); };
+$('pW').onchange = e => {
+  const v = +e.target.value;
+  if (!(v > 0)) return renderPanel();
+  if (project.ground.image || project.towers.length) {
+    if (confirm('Co giãn cả ảnh nền và các tòa đã vẽ theo kích thước mới?\n(OK = co giãn tất cả, Cancel = chỉ đổi khung mặt bằng)')) return rescaleAll(v / project.ground.widthMeters);
+  }
+  project.ground.widthMeters = v; commit(); draw();
+};
+$('pNorth').onchange = e => { project.ground.northDeg = +e.target.value || 0; commit(); };
+$('pH').onchange = e => { const v = +e.target.value; if (v > 0) { project.ground.heightMeters = v; commit(); } else renderPanel(); };
+$('btnImg').onclick = () => $('fileImg').click();
+$('fileImg').onchange = () => {
+  const f = $('fileImg').files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      // thu nhỏ ảnh quá lớn để file JSON gọn
+      const max = 3000, k = Math.min(1, max / Math.max(img.width, img.height));
+      let url = rd.result;
+      if (k < 1 || f.size > 1.5e6) {
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        url = c.toDataURL('image/jpeg', .85);
+      }
+      project.ground.image = url;
+      project.ground.heightMeters = round(project.ground.widthMeters * img.height / img.width);
+      loadBgImage(); renderPanel(); fit(); commit({ keepCamera: false });
+      firstPreview = true;
+      alert('Đã tải ảnh. Bước tiếp theo: dùng "📏 Đo tỉ lệ" — bấm 2 điểm đã biết khoảng cách thực để ảnh đúng kích thước mét.');
+    };
+    img.src = rd.result;
+  };
+  rd.readAsDataURL(f);
+  $('fileImg').value = '';
+};
+$('btnImgClear').onclick = () => { if (!project.ground.image || !confirm('Bỏ ảnh nền?')) return; project.ground.image = null; loadBgImage(); renderPanel(); commit(); };
+
+// ---- header
+$('btnNew').onclick = () => {
+  if (!confirm('Tạo dự án mới? Dữ liệu hiện tại sẽ bị thay (hãy Xuất JSON trước nếu cần giữ).')) return;
+  loadProject({ project: 'Dự án mới', ground: { image: null, widthMeters: 300, heightMeters: 200 }, towers: [] });
+  commit();
+};
+$('btnSample').onclick = () => { if (confirm('Nạp dữ liệu mẫu? Dữ liệu hiện tại sẽ bị thay.')) { loadProject(SAMPLE_PROJECT); commit(); } };
+$('btnImport').onclick = () => $('fileJson').click();
+$('fileJson').onchange = async () => {
+  const f = $('fileJson').files[0]; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!Array.isArray(d.towers)) throw new Error('thiếu mảng "towers"');
+    loadProject(d); commit();
+  } catch (err) { alert('File JSON không hợp lệ: ' + err.message); }
+  $('fileJson').value = '';
+};
+$('btnExport').onclick = () => {
+  const out = JSON.parse(JSON.stringify(project));
+  out.towers.forEach(t => delete t.id);
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (project.project || 'project3d').replace(/[^\w\-]+/g, '_') + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+// ---- khởi động
+let initial = null;
+try { initial = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch {}
+loadProject(initial || SAMPLE_PROJECT);
+setMode('select');
+</script>
+</body>
+</html>
